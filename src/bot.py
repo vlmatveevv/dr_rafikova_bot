@@ -111,7 +111,7 @@ async def buy_chapter_callback_handle(update: Update, context: CallbackContext) 
 
     # Получаем информацию о курсе
     chapter_key = f'ch_{num_of_chapter}'
-    course = config.courses['courses'].get(chapter_key)
+    course = config.courses.get(chapter_key)
 
     if not course:
         await query.edit_message_text("Раздел не найден.")
