@@ -154,9 +154,13 @@ async def buy_chapter_callback_handle(update: Update, context: CallbackContext) 
         disable_web_page_preview=True
     )
 
+
 async def pay_chapter_callback_handle(update: Update, context: CallbackContext) -> int:
     query = update.callback_query
     await query.answer()
+
+    # ✅ Чистим предыдущие данные — "сброс" прошлой покупки
+    context.user_data.clear()
 
     num_of_chapter = query.data.split(':')[1]
     chapter_key = f'ch_{num_of_chapter}'
@@ -166,11 +170,13 @@ async def pay_chapter_callback_handle(update: Update, context: CallbackContext) 
         await query.edit_message_text("Курс не найден.")
         return ConversationHandler.END
 
+    # Сохраняем новую попытку оплаты
     context.user_data['selected_course'] = course
     context.user_data['chapter_number'] = num_of_chapter
 
     email_msg = await query.edit_message_text("Введите ваш e-mail для отправки чека:")
     context.user_data['email_msg'] = email_msg
+
     return ASK_EMAIL
 
 
