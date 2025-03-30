@@ -7,7 +7,6 @@ import html
 import re
 import time as time_new
 from datetime import time, datetime, timedelta
-from idlelib import query
 from pathlib import Path
 
 import pytz
