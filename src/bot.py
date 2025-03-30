@@ -68,10 +68,38 @@ async def register(update: Update, context: CallbackContext) -> None:
     # Добавление информации о пользователе в базу данных
     if not await user_exists_pdb(user_id):
         pdb.add_user(user_id, username, first_name, last_name)
+
+    keyboard = [[InlineKeyboardButton(config.bot_btn['buy_courses'], callback_data='buy_courses')]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
     # Отправляем сообщение вместе с кнопкой
     await context.bot.send_message(chat_id=user_id,
                                    text=f"Hello, {first_name}",
+                                   reply_markup=reply_markup,
                                    parse_mode=ParseMode.HTML)
+
+
+async def buy_courses_callback_handle(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    await query.answer()
+    keyboard = []
+    for key, course in config.courses.items():
+        num_of_chapter = key.split('_')[1]  # Например, "1" из "ch_1"
+        button_text = course['name']  # Название из YAML: "1. ПОДГОТОВКА И ПЛАНИРОВАНИЕ БЕРЕМЕННОСТИ"
+        button = InlineKeyboardButton(
+            text=button_text,
+            callback_data=f'buy_chapter:{num_of_chapter}'
+        )
+        keyboard.append([button])  # Каждая кнопка на отдельной строке
+
+    # Создаем клавиатуру
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    # Отправляем сообщение
+    await query.edit_message_text(
+        text=config.bot_msg['choose_chapter'],
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.HTML
+    )
 
 
 def run():
@@ -94,6 +122,7 @@ def run():
     )
 
     application.add_handler(CommandHandler('start', register))
+    application.add_handler(CallbackQueryHandler(buy_courses_callback_handle, pattern="^buy_courses$"))
 
     logger.addHandler(logging.StreamHandler())
 
