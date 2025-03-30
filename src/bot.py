@@ -58,6 +58,20 @@ logger_for_httpx.setLevel(logging.WARNING)
 ASK_EMAIL, CONFIRM_PAYMENT = range(2)
 
 
+def reset_conversation(update: Update, context: CallbackContext) -> None:
+    """
+    Полностью сбрасывает активную conversation-сессию и user_data.
+    """
+    chat_id = update.effective_chat.id
+
+    # Сбросим состояние текущей conversation (если есть)
+    if hasattr(context, "conversation_data"):
+        context.conversation_data.pop(chat_id, None)
+
+    # Очистим данные пользователя
+    context.user_data.clear()
+
+
 async def user_exists_pdb(user_id: int) -> bool:
     return pdb.user_exists(user_id)
 
@@ -160,7 +174,7 @@ async def pay_chapter_callback_handle(update: Update, context: CallbackContext) 
     await query.answer()
 
     # ✅ Чистим предыдущие данные — "сброс" прошлой покупки
-    context.user_data.clear()
+    reset_conversation(update, context)
 
     num_of_chapter = query.data.split(':')[1]
     chapter_key = f'ch_{num_of_chapter}'
