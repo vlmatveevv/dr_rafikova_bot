@@ -102,6 +102,44 @@ async def buy_courses_callback_handle(update: Update, context: CallbackContext) 
     )
 
 
+async def buy_chapter_callback_handle(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    await query.answer()
+
+    # Получаем номер раздела из callback_data
+    num_of_chapter = query.data.split(':')[1]
+
+    # Получаем информацию о курсе
+    chapter_key = f'ch_{num_of_chapter}'
+    course = config.courses['courses'].get(chapter_key)
+
+    if not course:
+        await query.edit_message_text("Раздел не найден.")
+        return
+
+    # Формируем текст сообщения
+    text = config.bot_msg['buy_chapter_info'].format(
+        description=course['description'],
+        price=course['price'],
+        name=course['name']
+    )
+
+    # Создаем кнопки
+    keyboard = [
+        [InlineKeyboardButton("💳 Оплатить", callback_data=f'pay_chapter:{num_of_chapter}')],
+        [InlineKeyboardButton("🔙 Назад", callback_data='buy_courses')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    # Отправляем сообщение
+    await query.edit_message_text(
+        text=text,
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.HTML,
+        disable_web_page_preview=True
+    )
+
+
 def run():
     # Создание экземпляра RateLimiter
     rate_limiter = AIORateLimiter(
@@ -123,6 +161,7 @@ def run():
 
     application.add_handler(CommandHandler('start', register))
     application.add_handler(CallbackQueryHandler(buy_courses_callback_handle, pattern="^buy_courses$"))
+    application.add_handler(CallbackQueryHandler(buy_chapter_callback_handle(), pattern="^buy_chapter:"))
 
     logger.addHandler(logging.StreamHandler())
 
