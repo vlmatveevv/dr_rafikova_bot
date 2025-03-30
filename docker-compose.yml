@@ -2,7 +2,7 @@ services:
   app:
     build:
       context: .
-    container_name: 'loki-save-app'
+    container_name: 'dr-rafikova-app'
     environment:
       - LOGGING_LEVEL='info'
     volumes:
