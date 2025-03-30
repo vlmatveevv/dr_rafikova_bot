@@ -7,6 +7,7 @@ import html
 import re
 import time as time_new
 from datetime import time, datetime, timedelta
+from idlelib import query
 from pathlib import Path
 
 import pytz
@@ -156,14 +157,19 @@ async def pay_chapter_callback_handle(update: Update, context: CallbackContext) 
     context.user_data['selected_course'] = course
     context.user_data['chapter_number'] = num_of_chapter
 
-    await query.edit_message_text("Введите ваш e-mail для отправки чека:")
+    email_msg = await query.edit_message_text("Введите ваш e-mail для отправки чека:")
+    context.user_data['email_msg'] = email_msg
     return ASK_EMAIL
+
 
 async def ask_email_handle(update: Update, context: CallbackContext) -> int:
     email = update.message.text
     context.user_data['email'] = email
+    email_msg = context.user_data['email_msg']
+    user_id = update.effective_user.id
 
     # Удаляем предыдущее сообщение и запрос бота
+    await context.bot.delete_message(chat_id=user_id, message_id=email_msg.message_id)
     await update.message.delete()
     if update.message.reply_to_message:
         await update.message.reply_to_message.delete()
@@ -171,10 +177,11 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
     course = context.user_data['selected_course']
     num = context.user_data['chapter_number']
 
-    text = (
-        f"<b>Подтверждение</b>\n\n"
-        f"Ваш эл. адрес: {email}\n\n"
-        f"Вы покупаете курс <b>{course['name']}</b> раздел {num}"
+    text = config.bot_msg['confirm_purchase'].format(
+        email=email,
+        name=course['name'],
+        num=num,
+        price=course['price'],
     )
 
     keyboard = [

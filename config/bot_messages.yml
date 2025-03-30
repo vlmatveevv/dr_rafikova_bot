@@ -3,8 +3,15 @@ buy_chapter_info: |
   <b>Описание:</b>
   {description}
 
-  <b>Сумма к оплате:</b> {price} ₽
+  <b>Стоимость:</b> {price} ₽
 
   Покупая курс <b>{name}</b> вы подтверждаете свое согласие с 
   <a href='https://example.com/oferta'>договором-офертой</a> и 
   <a href='https://example.com/policy'>политикой обработки персональных данных</a>.
+confirm_purchase: |
+  <b>Подтверждение</b>
+
+  Ваш эл. адрес: {email}
+
+  Вы покупаете курс <b>{name}</b> раздел {num}
+  <b>Сумма к оплате:</b> {price} ₽
