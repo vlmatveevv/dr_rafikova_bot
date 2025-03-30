@@ -1,0 +1,30 @@
+from fastapi import FastAPI, BackgroundTasks
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+import logging
+import config
+from fastapi import Request
+from setup import pdb, moscow_tz
+from datetime import datetime
+
+# Настройка логгера
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+app = FastAPI()
+
+# Настройка CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Разрешает все источники
+    allow_credentials=True,
+    allow_methods=["*"],  # Разрешает все методы
+    allow_headers=["*"],  # Разрешает все заголовки
+)
+
+
+@app.post("/webhook/yookassa/")
+async def yookassa_webhook(request: Request, background_tasks: BackgroundTasks):
+    data = await request.json()
+    payment_object = data.get('object', {})
+    payment_id = payment_object.get('id')
+    return {"status": "ok"}

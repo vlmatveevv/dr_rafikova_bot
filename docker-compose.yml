@@ -1,3 +1,6 @@
+---
+version: '3'
+
 services:
   app:
     build:
@@ -8,3 +11,40 @@ services:
     volumes:
       - ./data:/data
     restart: unless-stopped
+    networks:
+      - app-network
+    depends_on:
+      - dr-rafikova-db
+    command: [ "python", "__main__.py" ]
+
+  dr-rafikova-db:
+    image: postgres:16
+    container_name: 'dr-rafikova-db'
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  uvicorn:
+      build:
+        context: .
+      container_name: 'dr-rafikova-uvicorn'
+      working_dir: /app  # Рабочая директория для Uvicorn
+      command: [ "python", "-m", "uvicorn", "webhook_handle:app", "--host", "0.0.0.0", "--port", "8000" ]
+      ports:
+        - "8000:8000"
+      restart: unless-stopped
+      networks:
+        - app-network
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+

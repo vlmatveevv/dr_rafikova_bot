@@ -1,6 +1,11 @@
-python-telegram-bot[rate-limiter]==21.1.1
+python-telegram-bot[rate-limiter]==20.3
 python-telegram-bot[job-queue]
 python_dotenv
 pytz
 pyyaml
 pymorphy3==2.0.1
+yookassa==3.3.0
+fastapi
+uvicorn[standard]
+aiohttp>=3.8.0
+psycopg2==2.9.5
