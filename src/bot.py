@@ -189,13 +189,13 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
         parse_mode=ParseMode.HTML
     )
 
-    return ConversationHandler.END
 
 async def cancel_payment_handle(update: Update, context: CallbackContext) -> int:
     query = update.callback_query
     await query.answer()
     await query.edit_message_text("Покупка отменена.")
     return ConversationHandler.END
+
 
 buy_course_conversation = ConversationHandler(
     entry_points=[CallbackQueryHandler(pay_chapter_callback_handle, pattern=r'^pay_chapter:\d+$')],
