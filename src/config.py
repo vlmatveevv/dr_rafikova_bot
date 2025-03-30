@@ -1,6 +1,7 @@
 from pathlib import Path
 import yaml
 import os
+import dotenv
 
 base_dir = Path(__file__).parent
 config_dir = base_dir.joinpath("config")
@@ -15,3 +16,5 @@ def read_yaml_file(file_path):
 
 # Чтение конфигурационных файлов
 cfg = read_yaml_file(config_dir.joinpath("config.yml"))
+
+config_env = dotenv.dotenv_values(config_dir / ".env")

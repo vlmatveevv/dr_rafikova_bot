@@ -77,7 +77,7 @@ def run():
 
     application = (
         ApplicationBuilder()
-        .token(config.cfg['TELEGRAM_TOKEN'])
+        .token(config.config_env['TELEGRAM_TOKEN'])
         .read_timeout(60)
         .write_timeout(60)
         .concurrent_updates(True)
