@@ -1,2 +1,4 @@
 buy_courses: "Приобрести курс"
 chapter: "Раздел {num_of_chapter}"
+go_to_pay: "Перейти к оплате"
+go_back: "Назад"

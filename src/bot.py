@@ -55,6 +55,8 @@ logger_for_httpx = logging.getLogger('httpx')
 # Установите уровень логирования на WARNING, чтобы скрыть INFO и DEBUG сообщения
 logger_for_httpx.setLevel(logging.WARNING)
 
+ASK_EMAIL, CONFIRM_PAYMENT = range(2)
+
 
 async def user_exists_pdb(user_id: int) -> bool:
     return pdb.user_exists(user_id)
@@ -126,8 +128,8 @@ async def buy_chapter_callback_handle(update: Update, context: CallbackContext) 
 
     # Создаем кнопки
     keyboard = [
-        [InlineKeyboardButton("💳 Оплатить", callback_data=f'pay_chapter:{num_of_chapter}')],
-        [InlineKeyboardButton("🔙 Назад", callback_data='buy_courses')]
+        [InlineKeyboardButton(config.bot_btn['go_to_pay'], callback_data=f'pay_chapter:{num_of_chapter}')],
+        [InlineKeyboardButton(config.bot_btn['go_back'], callback_data='buy_courses')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -138,6 +140,70 @@ async def buy_chapter_callback_handle(update: Update, context: CallbackContext) 
         parse_mode=ParseMode.HTML,
         disable_web_page_preview=True
     )
+
+async def pay_chapter_callback_handle(update: Update, context: CallbackContext) -> int:
+    query = update.callback_query
+    await query.answer()
+
+    num_of_chapter = query.data.split(':')[1]
+    chapter_key = f'ch_{num_of_chapter}'
+    course = config.courses.get(chapter_key)
+
+    if not course:
+        await query.edit_message_text("Курс не найден.")
+        return ConversationHandler.END
+
+    context.user_data['selected_course'] = course
+    context.user_data['chapter_number'] = num_of_chapter
+
+    await query.edit_message_text("Введите ваш e-mail для отправки чека:")
+    return ASK_EMAIL
+
+async def ask_email_handle(update: Update, context: CallbackContext) -> int:
+    email = update.message.text
+    context.user_data['email'] = email
+
+    # Удаляем предыдущее сообщение и запрос бота
+    await update.message.delete()
+    if update.message.reply_to_message:
+        await update.message.reply_to_message.delete()
+
+    course = context.user_data['selected_course']
+    num = context.user_data['chapter_number']
+
+    text = (
+        f"<b>Подтверждение</b>\n\n"
+        f"Ваш эл. адрес: {email}\n\n"
+        f"Вы покупаете курс <b>{course['name']}</b> раздел {num}"
+    )
+
+    keyboard = [
+        [InlineKeyboardButton("✅ Подтвердить и оплатить", url="https://example.com/payment-link")],
+        [InlineKeyboardButton("❌ Отмена", callback_data="cancel_payment")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.chat.send_message(
+        text=text,
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.HTML
+    )
+
+    return ConversationHandler.END
+
+async def cancel_payment_handle(update: Update, context: CallbackContext) -> int:
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text("Покупка отменена.")
+    return ConversationHandler.END
+
+buy_course_conversation = ConversationHandler(
+    entry_points=[CallbackQueryHandler(pay_chapter_callback_handle, pattern=r'^pay_chapter:\d+$')],
+    states={
+        ASK_EMAIL: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_email_handle)],
+    },
+    fallbacks=[CallbackQueryHandler(cancel_payment_handle, pattern='^cancel_payment$')],
+)
 
 
 def run():
@@ -162,6 +228,7 @@ def run():
     application.add_handler(CommandHandler('start', register))
     application.add_handler(CallbackQueryHandler(buy_courses_callback_handle, pattern="^buy_courses$"))
     application.add_handler(CallbackQueryHandler(buy_chapter_callback_handle, pattern="^buy_chapter:"))
+    application.add_handler(buy_course_conversation)
 
     logger.addHandler(logging.StreamHandler())
 
