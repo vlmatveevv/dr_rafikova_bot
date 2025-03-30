@@ -1,0 +1,6 @@
+python-telegram-bot[rate-limiter]==21.1.1
+python-telegram-bot[job-queue]
+python_dotenv
+pytz
+pyyaml
+pymorphy3==2.0.1

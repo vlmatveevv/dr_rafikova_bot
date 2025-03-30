@@ -1,0 +1,10 @@
+services:
+  app:
+    build:
+      context: .
+    container_name: 'loki-save-app'
+    environment:
+      - LOGGING_LEVEL='info'
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
