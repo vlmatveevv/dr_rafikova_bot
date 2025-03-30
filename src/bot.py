@@ -219,6 +219,7 @@ async def cancel_payment_handle(update: Update, context: CallbackContext) -> int
     query = update.callback_query
     await query.answer()
     await query.edit_message_text("Покупка отменена.")
+    context.user_data.clear()
     return ConversationHandler.END
 
 
