@@ -62,22 +62,35 @@ async def user_exists_pdb(user_id: int) -> bool:
     return pdb.user_exists(user_id)
 
 
-async def register(update: Update, context: CallbackContext) -> None:
+async def register(update: Update, context: CallbackContext) -> int:
     user_id = update.effective_user.id
     first_name = update.effective_user.first_name or ""
     last_name = update.effective_user.last_name or ""
     username = update.effective_chat.username or ""
-    # Добавление информации о пользователе в базу данных
+
+    # ✅ Завершаем conversation, если вдруг юзер зашёл повторно
+    if 'selected_course' in context.user_data:
+        await update.message.reply_text(
+            "⚠️ Предыдущий заказ был отменён, так как вы не завершили оплату.",
+            parse_mode=ParseMode.HTML
+        )
+        context.user_data.clear()
+
+    # Добавление пользователя в БД
     if not await user_exists_pdb(user_id):
         pdb.add_user(user_id, username, first_name, last_name)
 
     keyboard = [[InlineKeyboardButton(config.bot_btn['buy_courses'], callback_data='buy_courses')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    # Отправляем сообщение вместе с кнопкой
-    await context.bot.send_message(chat_id=user_id,
-                                   text=f"Hello, {first_name}",
-                                   reply_markup=reply_markup,
-                                   parse_mode=ParseMode.HTML)
+
+    await context.bot.send_message(
+        chat_id=user_id,
+        text=f"Hello, {first_name}",
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.HTML
+    )
+
+    return ConversationHandler.END
 
 
 async def buy_courses_callback_handle(update: Update, context: CallbackContext) -> None:

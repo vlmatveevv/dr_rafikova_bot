@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="com.obiscr.chatgpt.settings.EasyCodeState">
+    <option name="projectFiles" value="$PROJECT_DIR$/src/__main__.py;/Users/vladislavmatveev/dr_rafikova_bot/src/bot.py;/Users/vladislavmatveev/dr_rafikova_bot/src/config.py;/Users/vladislavmatveev/dr_rafikova_bot/src/postgresdb.py;/Users/vladislavmatveev/dr_rafikova_bot/src/setup.py;/Users/vladislavmatveev/dr_rafikova_bot/src/webhook_handle.py" />
+  </component>
+</project>
