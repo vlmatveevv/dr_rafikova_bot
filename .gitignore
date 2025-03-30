@@ -1,0 +1,37 @@
+# Игнорировать все в папке config
+/config/*
+
+# Исключение для bot_messages.yml
+!/config/bot_messages.yml
+!/config/bot_buttons.yml
+!/config/admin_messages.yml
+!/config/admin_buttons.yml
+!/config/other.yml
+
+# Игнорировать Postgres данные
+/postgres-data/
+
+# Игнорировать файлы резервных копий и логов
+/backup/
+*.log
+
+# Игнорировать виртуальные окружения
+venv/
+env/
+
+# Игнорировать файлы Docker
+docker-compose.override.yml
+docker-compose.local.yml
+docker-compose.yml  # добавляем эту строку
+
+# Игнорировать файлы кэша и временные файлы
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Игнорировать Jupyter Notebook чекпоинты
+.ipynb_checkpoints/
+
+# Игнорировать скрипт deploy.sh
+deploy.sh
