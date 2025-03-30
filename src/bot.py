@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytz
 import telegram
+from setup import pdb
 import config
 import yaml
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, BotCommand, ReplyKeyboardMarkup, \
@@ -55,11 +56,18 @@ logger_for_httpx = logging.getLogger('httpx')
 logger_for_httpx.setLevel(logging.WARNING)
 
 
+async def user_exists_pdb(user_id: int) -> bool:
+    return pdb.user_exists(user_id)
+
+
 async def register(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
     first_name = update.effective_user.first_name or ""
     last_name = update.effective_user.last_name or ""
     username = update.effective_chat.username or ""
+    # Добавление информации о пользователе в базу данных
+    if not await user_exists_pdb(user_id):
+        pdb.add_user(user_id, username, first_name, last_name)
     # Отправляем сообщение вместе с кнопкой
     await context.bot.send_message(chat_id=user_id,
                                    text=f"Hello, {first_name}",
