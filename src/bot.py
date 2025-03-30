@@ -161,7 +161,7 @@ def run():
 
     application.add_handler(CommandHandler('start', register))
     application.add_handler(CallbackQueryHandler(buy_courses_callback_handle, pattern="^buy_courses$"))
-    application.add_handler(CallbackQueryHandler(buy_chapter_callback_handle(), pattern="^buy_chapter:"))
+    application.add_handler(CallbackQueryHandler(buy_chapter_callback_handle, pattern="^buy_chapter:"))
 
     logger.addHandler(logging.StreamHandler())
 
