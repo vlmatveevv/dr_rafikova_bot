@@ -208,8 +208,6 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
         parse_mode=ParseMode.HTML
     )
 
-    return ConversationHandler.END
-
 
 # Отмена покупки
 async def cancel_payment_handle(update: Update, context: CallbackContext) -> int:
