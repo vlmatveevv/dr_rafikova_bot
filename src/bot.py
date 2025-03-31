@@ -68,6 +68,16 @@ async def register(update: Update, context: CallbackContext) -> int:
     last_name = update.effective_user.last_name or ""
     username = update.effective_chat.username or ""
 
+    # Не даём пользователю начать второй заказ, если первый не завершён
+    if context.user_data.get('is_in_conversation'):
+        keyboard = [
+            [InlineKeyboardButton("✅ Подтвердить и оплатить", url="https://example.com/payment-link")],
+            [InlineKeyboardButton("❌ Отмена", callback_data="cancel_payment")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text("У вас есть незавершённый заказ ⛔️", reply_markup=reply_markup)
+        return ASK_EMAIL
+
     # Добавление пользователя в БД
     if not await user_exists_pdb(user_id):
         pdb.add_user(user_id, username, first_name, last_name)
@@ -197,8 +207,7 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
     )
 
     keyboard = [
-        [InlineKeyboardButton("✅ Подтвердить и оплатить", url="https://example.com/payment-link")],
-        [InlineKeyboardButton("❌ Отмена", callback_data="cancel_payment")]
+        [InlineKeyboardButton("✅ Подтвердить и оплатить", url="https://example.com/payment-link")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -207,6 +216,7 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
         reply_markup=reply_markup,
         parse_mode=ParseMode.HTML
     )
+    return ConversationHandler.END
 
 
 # Отмена покупки
