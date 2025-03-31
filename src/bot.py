@@ -229,15 +229,16 @@ async def cancel_payment_handle(update: Update, context: CallbackContext) -> int
     return ConversationHandler.END
 
 
-# ConversationHandler
 buy_course_conversation = ConversationHandler(
-    entry_points=[CallbackQueryHandler(pay_chapter_callback_handle, pattern=r'^pay_chapter:\d+$')],
+    entry_points=[
+        CallbackQueryHandler(pay_chapter_callback_handle, pattern=r'^pay_chapter:\d+$'),
+        CommandHandler('start', register)  # добавляем второй entry point
+    ],
     states={
         ASK_EMAIL: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_email_handle)],
     },
     fallbacks=[CallbackQueryHandler(cancel_payment_handle, pattern='^cancel_payment$')],
 )
-
 
 def run():
     # Создание экземпляра RateLimiter
