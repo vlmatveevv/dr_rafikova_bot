@@ -58,6 +58,13 @@ logger_for_httpx.setLevel(logging.WARNING)
 ASK_EMAIL = 1
 
 
+# Обработка ввода email
+def is_valid_email(email: str) -> bool:
+    # Регулярное выражение для проверки корректности email
+    pattern = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
+    return re.match(pattern, email) is not None
+
+
 async def user_exists_pdb(user_id: int) -> bool:
     return pdb.user_exists(user_id)
 
@@ -165,17 +172,26 @@ async def pay_chapter_callback_handle(update: Update, context: CallbackContext) 
 # Обработка ввода email
 async def ask_email_handle(update: Update, context: CallbackContext) -> int:
     logger.info("📨 Получен email от пользователя")
-    email = update.message.text
+    email = update.message.text.strip()
+
+    # Проверка email
+    if not is_valid_email(email):
+        await update.message.reply_text(
+            "Некорректный e-mail. Пожалуйста, введите корректный e-mail:"
+        )
+        return ASK_EMAIL  # Остаёмся в текущем состоянии для повторного ввода
+
     context.user_data['email'] = email
-    email_msg = context.user_data['email_msg']
+    email_msg = context.user_data.get('email_msg')
     user_id = update.effective_user.id
 
-    # Удаляем сообщение и e-mail
+    # Удаляем сообщение с запросом email и сам ввод пользователя
     try:
-        await context.bot.delete_message(chat_id=user_id, message_id=email_msg.message_id)
+        if email_msg:
+            await context.bot.delete_message(chat_id=user_id, message_id=email_msg.message_id)
         await update.message.delete()
-    except:
-        pass
+    except Exception as e:
+        logger.error(f"Ошибка удаления сообщения: {e}")
 
     course = context.user_data['selected_course']
     num = context.user_data['chapter_number']
@@ -200,7 +216,6 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
     )
     context.user_data.clear()
     return ConversationHandler.END
-
 
 # Отмена покупки
 async def cancel_payment_handle(update: Update, context: CallbackContext) -> int:
