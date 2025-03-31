@@ -198,6 +198,7 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
         reply_markup=reply_markup,
         parse_mode=ParseMode.HTML
     )
+    context.user_data.clear()
     return ConversationHandler.END
 
 
@@ -212,13 +213,13 @@ async def cancel_payment_handle(update: Update, context: CallbackContext) -> int
 
 
 buy_course_conversation = ConversationHandler(
-    entry_points=[
-        CallbackQueryHandler(pay_chapter_callback_handle, pattern=r'^pay_chapter:\d+$')
-    ],
+    entry_points=[CallbackQueryHandler(pay_chapter_callback_handle, pattern=r'^pay_chapter:\d+$')],
     states={
         ASK_EMAIL: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_email_handle)],
     },
-    fallbacks=[CallbackQueryHandler(cancel_payment_handle, pattern='^cancel_payment$')]
+    fallbacks=[CallbackQueryHandler(cancel_payment_handle, pattern='^cancel_payment$')],
+    per_message=True,
+    per_user=True  # 👈 обязательно вместе с per_message
 )
 
 
