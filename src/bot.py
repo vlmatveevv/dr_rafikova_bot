@@ -58,20 +58,6 @@ logger_for_httpx.setLevel(logging.WARNING)
 ASK_EMAIL, CONFIRM_PAYMENT = range(2)
 
 
-def reset_conversation(update: Update, context: CallbackContext) -> None:
-    """
-    Полностью сбрасывает активную conversation-сессию и user_data.
-    """
-    chat_id = update.effective_chat.id
-
-    # Сбросим состояние текущей conversation (если есть)
-    if hasattr(context, "conversation_data"):
-        context.conversation_data.pop(chat_id, None)
-
-    # Очистим данные пользователя
-    context.user_data.clear()
-
-
 async def user_exists_pdb(user_id: int) -> bool:
     return pdb.user_exists(user_id)
 
@@ -173,15 +159,23 @@ async def pay_chapter_callback_handle(update: Update, context: CallbackContext) 
     query = update.callback_query
     await query.answer()
 
-    # ✅ Чистим предыдущие данные — "сброс" прошлой покупки
-    reset_conversation(update, context)
-
     num_of_chapter = query.data.split(':')[1]
     chapter_key = f'ch_{num_of_chapter}'
     course = config.courses.get(chapter_key)
 
     if not course:
         await query.edit_message_text("Курс не найден.")
+        return ConversationHandler.END
+
+    course = context.user_data['selected_course']
+    if course:
+        keyboard = [
+            [InlineKeyboardButton("✅ Подтвердить и оплатить", url="https://example.com/payment-link")],
+            [InlineKeyboardButton("❌ Отмена", callback_data="cancel_payment")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(text="У вас есть незакочненный заказ", reply_markup=reply_markup)
+        context.user_data.clear()
         return ConversationHandler.END
 
     # Сохраняем новую попытку оплаты
