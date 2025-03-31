@@ -164,6 +164,7 @@ async def pay_chapter_callback_handle(update: Update, context: CallbackContext) 
 
 # Обработка ввода email
 async def ask_email_handle(update: Update, context: CallbackContext) -> int:
+    logger.info("📨 Получен email от пользователя")
     email = update.message.text
     context.user_data['email'] = email
     email_msg = context.user_data['email_msg']
