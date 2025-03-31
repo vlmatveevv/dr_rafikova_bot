@@ -152,7 +152,7 @@ async def pay_chapter_callback_handle(update: Update, context: CallbackContext) 
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text("У вас есть незавершённый заказ ⛔️", reply_markup=reply_markup)
-        return ConversationHandler.END
+        return ASK_EMAIL
 
     num_of_chapter = query.data.split(':')[1]
     course = config.courses.get(f'ch_{num_of_chapter}')
