@@ -68,16 +68,6 @@ async def register(update: Update, context: CallbackContext) -> int:
     last_name = update.effective_user.last_name or ""
     username = update.effective_chat.username or ""
 
-    # Не даём пользователю начать второй заказ, если первый не завершён
-    if context.user_data.get('is_in_conversation'):
-        keyboard = [
-            [InlineKeyboardButton("✅ Подтвердить и оплатить", url="https://example.com/payment-link")],
-            [InlineKeyboardButton("❌ Отмена", callback_data="cancel_payment")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text("У вас есть незавершённый заказ ⛔️", reply_markup=reply_markup)
-        return ASK_EMAIL
-
     # Добавление пользователя в БД
     if not await user_exists_pdb(user_id):
         pdb.add_user(user_id, username, first_name, last_name)
@@ -154,16 +144,6 @@ async def pay_chapter_callback_handle(update: Update, context: CallbackContext) 
     query = update.callback_query
     await query.answer()
 
-    # Не даём пользователю начать второй заказ, если первый не завершён
-    if context.user_data.get('is_in_conversation'):
-        keyboard = [
-            [InlineKeyboardButton("✅ Подтвердить и оплатить", url="https://example.com/payment-link")],
-            [InlineKeyboardButton("❌ Отмена", callback_data="cancel_payment")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text("У вас есть незавершённый заказ ⛔️", reply_markup=reply_markup)
-        return ASK_EMAIL
-
     num_of_chapter = query.data.split(':')[1]
     course = config.courses.get(f'ch_{num_of_chapter}')
 
@@ -231,14 +211,14 @@ async def cancel_payment_handle(update: Update, context: CallbackContext) -> int
 
 buy_course_conversation = ConversationHandler(
     entry_points=[
-        CallbackQueryHandler(pay_chapter_callback_handle, pattern=r'^pay_chapter:\d+$'),
-        CommandHandler('start', register)  # добавляем второй entry point
+        CallbackQueryHandler(pay_chapter_callback_handle, pattern=r'^pay_chapter:\d+$')
     ],
     states={
         ASK_EMAIL: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_email_handle)],
     },
     fallbacks=[CallbackQueryHandler(cancel_payment_handle, pattern='^cancel_payment$')],
 )
+
 
 def run():
     # Создание экземпляра RateLimiter
