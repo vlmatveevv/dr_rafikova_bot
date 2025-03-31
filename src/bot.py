@@ -218,8 +218,7 @@ buy_course_conversation = ConversationHandler(
     states={
         ASK_EMAIL: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_email_handle)],
     },
-    fallbacks=[CallbackQueryHandler(cancel_payment_handle, pattern='^cancel_payment$')],
-    per_message=True,  # 🔧 Добавлено
+    fallbacks=[CallbackQueryHandler(cancel_payment_handle, pattern='^cancel_payment$')]
 )
 
 
