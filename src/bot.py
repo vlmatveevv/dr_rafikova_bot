@@ -167,9 +167,9 @@ async def pay_chapter_callback_handle(update: Update, context: CallbackContext) 
         await query.edit_message_text("Курс не найден.")
         return ConversationHandler.END
 
-    course = context.user_data.get('selected_course', None)
+    selected_course = context.user_data.get('selected_course', None)
 
-    if course:
+    if selected_course:
         keyboard = [
             [InlineKeyboardButton("✅ Подтвердить и оплатить", url="https://example.com/payment-link")],
             [InlineKeyboardButton("❌ Отмена", callback_data="cancel_payment")]
