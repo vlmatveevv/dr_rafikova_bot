@@ -187,7 +187,8 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
     )
 
     keyboard = [
-        [InlineKeyboardButton("✅ Подтвердить и оплатить", url="https://example.com/payment-link")]
+        [InlineKeyboardButton("✅ Подтвердить и оплатить", url="https://example.com/payment-link")],
+        [InlineKeyboardButton("✅ Вступить в канал", url=course['link'])],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
