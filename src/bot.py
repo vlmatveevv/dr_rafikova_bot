@@ -68,14 +68,6 @@ async def register(update: Update, context: CallbackContext) -> int:
     last_name = update.effective_user.last_name or ""
     username = update.effective_chat.username or ""
 
-    # ✅ Завершаем conversation, если вдруг юзер зашёл повторно
-    if 'selected_course' in context.user_data:
-        await update.message.reply_text(
-            "⚠️ Предыдущий заказ был отменён, так как вы не завершили оплату.",
-            parse_mode=ParseMode.HTML
-        )
-        context.user_data.clear()
-
     # Добавление пользователя в БД
     if not await user_exists_pdb(user_id):
         pdb.add_user(user_id, username, first_name, last_name)
@@ -158,7 +150,7 @@ async def buy_chapter_callback_handle(update: Update, context: CallbackContext) 
 async def pay_chapter_callback_handle(update: Update, context: CallbackContext) -> int:
     query = update.callback_query
     await query.answer()
-
+    logger.info("line 153")
     num_of_chapter = query.data.split(':')[1]
     chapter_key = f'ch_{num_of_chapter}'
     course = config.courses.get(chapter_key)
