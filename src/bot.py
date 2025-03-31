@@ -55,7 +55,7 @@ logger_for_httpx = logging.getLogger('httpx')
 # Установите уровень логирования на WARNING, чтобы скрыть INFO и DEBUG сообщения
 logger_for_httpx.setLevel(logging.WARNING)
 
-ASK_EMAIL = range(1)
+ASK_EMAIL = 1
 
 
 async def user_exists_pdb(user_id: int) -> bool:
