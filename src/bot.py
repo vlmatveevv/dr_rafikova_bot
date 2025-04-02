@@ -374,7 +374,8 @@ async def upd_payment_url_handle(update: Update, context: CallbackContext) -> No
             num=num,
             price=course['price'],
         ),
-        reply_markup=reply_markup
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.HTML
     )
 
 
