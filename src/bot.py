@@ -287,7 +287,7 @@ def run():
     logger.addHandler(logging.StreamHandler())
 
     # Запуск бота
-    application.run_polling()
+    application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
 if __name__ == '__main__':
