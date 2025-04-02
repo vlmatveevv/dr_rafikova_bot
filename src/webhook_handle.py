@@ -34,7 +34,8 @@ async def yookassa_webhook(request: Request, background_tasks: BackgroundTasks):
 
     channel_id = course['channel_id']
     channel_invite_url = await telegram_https.create_invite_link(
-        chat_id=channel_id
+        chat_id=channel_id,
+        creates_join_request=True
     )
     await telegram_https.send_message(
         user_id=user_id,

@@ -173,7 +173,7 @@ async def create_invite_link(chat_id: int, name: str = None, expire_date: int = 
             if response.status == 200 and response_data.get("ok"):
                 invite_link = response_data['result']['invite_link']
                 logger.info(f"🔗 Ссылка создана: {invite_link}")
-                return response_data['result']
+                return response_data['result']['invite_link']
             else:
                 logger.error(f"❌ Ошибка при создании ссылки: {response_data}")
                 return None
