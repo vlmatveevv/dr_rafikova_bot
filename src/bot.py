@@ -241,9 +241,16 @@ async def cancel_payment_handle(update: Update, context: CallbackContext) -> int
 async def handle_join_request(update: Update, context: CallbackContext):
     join_request = update.chat_join_request
     user_id = join_request.from_user.id
+    chat_id = update.chat_join_request.chat.id
+
+    channel_invite_link = config.channel_map.get(chat_id)
 
     if user_id in allowed_users:
         await join_request.approve()
+        await context.bot.send_message(
+            text="Для перехода в канал нажмите на кнопку ниже",
+            url=channel_invite_link
+        )
         logger.info(f"✅ Одобрен вход для {allowed_users[user_id]} ({user_id})")
     else:
         await join_request.decline()

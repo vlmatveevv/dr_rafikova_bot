@@ -42,7 +42,7 @@ async def yookassa_webhook(request: Request, background_tasks: BackgroundTasks):
 
     await telegram_https.send_message(
         user_id=user_id,
-        text=channel_invite_url,
+        text="Для вступления в канал нажмите на кнопку ниже",
         reply_markup=reply_markup
     )
     return {"status": "ok"}

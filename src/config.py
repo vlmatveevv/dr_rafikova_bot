@@ -21,6 +21,15 @@ other_cfg = read_yaml_file(config_dir.joinpath("other.yml"))
 bot_msg = read_yaml_file(config_dir.joinpath("bot_messages.yml"))
 bot_btn = read_yaml_file(config_dir.joinpath("bot_buttons.yml"))
 
+config_env = dotenv.dotenv_values(config_dir / ".env")
+
 courses = read_yaml_file(data_dir.joinpath("courses.yml"))
 
-config_env = dotenv.dotenv_values(config_dir / ".env")
+channel_map = {}
+
+for key, value in courses.items():
+    if isinstance(value, dict):
+        channel_id = value.get('channel_id')
+        invite_link = value.get('channel_invite_link')
+        if channel_id and invite_link:
+            channel_map[channel_id] = invite_link
