@@ -247,9 +247,13 @@ async def handle_join_request(update: Update, context: CallbackContext):
 
     if user_id in allowed_users:
         await join_request.approve()
+        keyboard = [
+            [InlineKeyboardButton("✅ Перейти в канал", url=channel_invite_link)],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
         await context.bot.send_message(
             text="Для перехода в канал нажмите на кнопку ниже",
-            url=channel_invite_link
+            reply_markup=reply_markup
         )
         logger.info(f"✅ Одобрен вход для {allowed_users[user_id]} ({user_id})")
     else:
