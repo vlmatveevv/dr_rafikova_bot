@@ -8,7 +8,7 @@ def generate_order_number():
         number = ''.join(random.choices(string.digits, k=5))  # Генерируем 5 случайных цифр
 
         try:
-            if pdb.check_order_number_unique(number):  # Проверяем уникальность
+            if pdb.check_order_code_unique(number):  # Проверяем уникальность
                 return number
         except Exception as e:
             print(f"Error checking order number uniqueness: {e}")
