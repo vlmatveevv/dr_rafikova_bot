@@ -204,7 +204,7 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
 
     course = context.user_data['selected_course']
     num = context.user_data['chapter_number']
-    email = context.user_data['chapter_number']
+    email = context.user_data['email']
 
     text = config.bot_msg['confirm_purchase'].format(
         email=email,

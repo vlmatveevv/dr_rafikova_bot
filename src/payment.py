@@ -28,7 +28,7 @@ async def create_payment(price, user_id, email, num_of_chapter):
         },
         "receipt": {
             "customer": {
-                "email": str(email)
+                "email": email
             },
             "items": [
                 {
