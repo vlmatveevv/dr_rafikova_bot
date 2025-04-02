@@ -28,7 +28,9 @@ from telegram.ext import (
     TypeHandler,
     JobQueue,
     AIORateLimiter,
+    ChatJoinRequestHandler,
     filters)
+
 
 import payment
 
@@ -37,6 +39,11 @@ locale.setlocale(locale.LC_TIME, ('ru_RU', 'UTF-8'))
 
 # Установка часового пояса МСК
 moscow_tz = pytz.timezone('Europe/Moscow')
+
+# Это словарь одобренных пользователей
+allowed_users = {
+    7768888247: "Roman"
+}
 
 
 # Функция для форматирования времени в логах
@@ -230,6 +237,18 @@ async def cancel_payment_handle(update: Update, context: CallbackContext) -> int
     return ConversationHandler.END
 
 
+async def handle_join_request(update: Update, context: CallbackContext):
+    join_request = update.chat_join_request
+    user_id = join_request.from_user.id
+
+    if user_id in allowed_users:
+        await join_request.approve()
+        logger.info(f"✅ Одобрен вход для {allowed_users[user_id]} ({user_id})")
+    else:
+        await join_request.decline()
+        logger.info(f"❌ Отклонён вход для неизвестного пользователя {user_id}")
+
+
 buy_course_conversation = ConversationHandler(
     entry_points=[CallbackQueryHandler(pay_chapter_callback_handle, pattern=r'^pay_chapter:\d+$')],
     states={
@@ -263,6 +282,7 @@ def run():
     application.add_handler(CallbackQueryHandler(buy_courses_callback_handle, pattern="^buy_courses$"))
     application.add_handler(CallbackQueryHandler(buy_chapter_callback_handle, pattern="^buy_chapter:"))
     application.add_handler(buy_course_conversation)
+    application.add_handler(ChatJoinRequestHandler(handle_join_request))
 
     logger.addHandler(logging.StreamHandler())
 
