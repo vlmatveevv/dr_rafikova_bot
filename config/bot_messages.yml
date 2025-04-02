@@ -4,10 +4,6 @@ buy_chapter_info: |
   {description}
 
   <b>Стоимость:</b> {price} ₽
-
-  Покупая курс <b>{name}</b> вы подтверждаете свое согласие с 
-  <a href='https://telegra.ph/Dogovor-oferty-bot-Doktor-Rafikova-04-02'>договором-офертой</a> и 
-  <a href='https://telegra.ph/Politika-obrabotki-konfidencialnyh-dannyh-bot-Doktor-Rafikova-04-02'>политикой обработки персональных данных</a>.
 confirm_purchase: |
   <b>Подтверждение</b>
 
