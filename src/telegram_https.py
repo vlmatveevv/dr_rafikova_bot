@@ -144,7 +144,8 @@ async def delete_message(chat_id: int, message_id: int):
                 logger.error(f"❌ Ошибка при удалении сообщения {message_id} у {chat_id}: {response_data}")
 
 
-async def create_invite_link(chat_id: int, name: str = None, expire_date: int = None, member_limit: int = 1, creates_join_request: bool = False):
+async def create_invite_link(chat_id: int, creates_join_request: bool, name: str = None,
+                             member_limit: int = None, expire_date: int = None):
     """
     Создаёт персональную ссылку на приглашение в канал/группу.
 
