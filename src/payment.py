@@ -6,7 +6,8 @@ Configuration.secret_key = config.config_env['SECRET_KEY']
 
 
 async def create_payment(price, user_id, num_of_chapter):
-    course = config.courses.get(f'ch_{num_of_chapter}')
+    formatted_chapter = f'ch_{num_of_chapter}'
+    course = config.courses.get(formatted_chapter)
     name = course['name']
     payment = Payment.create({
         "amount": {
@@ -23,7 +24,7 @@ async def create_payment(price, user_id, num_of_chapter):
         "metadata": {
             "type": "self",
             "user_id": user_id,
-            "chapter": course,
+            "chapter": formatted_chapter,
         },
         "receipt": {
             "customer": {
