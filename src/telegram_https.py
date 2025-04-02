@@ -12,7 +12,7 @@ async def send_message(user_id: int, text, reply_markup=None, message_thread_id=
     # Проверяем, соответствует ли событие успешной оплате
     async with aiohttp.ClientSession() as session:
         # Здесь необходимо указать ваш токен и chat_id
-        url = f"https://api.telegram.org/bot{config.cfg['TELEGRAM_TOKEN']}/sendMessage"
+        url = f"https://api.telegram.org/bot{config.config_env['TELEGRAM_TOKEN']}/sendMessage"
         payload = {
             'chat_id': user_id,  # Укажите chat_id группы
             'text': text,
@@ -44,7 +44,7 @@ async def send_location(user_id: int, latitude: float, longitude: float):
     # Проверяем, соответствует ли событие успешной оплате
     async with aiohttp.ClientSession() as session:
         # Здесь необходимо указать ваш токен и chat_id
-        url = f"https://api.telegram.org/bot{config.cfg['TELEGRAM_TOKEN']}/sendLocation"
+        url = f"https://api.telegram.org/bot{config.config_env['TELEGRAM_TOKEN']}/sendLocation"
         payload = {
             'chat_id': user_id,  # Укажите chat_id группы
             'latitude': latitude,
@@ -64,7 +64,7 @@ async def send_photo(user_id: int, photo, reply_markup=None, message_thread_id=N
     # Проверяем, соответствует ли событие успешной оплате
     async with aiohttp.ClientSession() as session:
         # Здесь необходимо указать ваш токен и chat_id
-        url = f"https://api.telegram.org/bot{config.cfg['TELEGRAM_TOKEN']}/sendPhoto"
+        url = f"https://api.telegram.org/bot{config.config_env['TELEGRAM_TOKEN']}/sendPhoto"
         payload = {
             'chat_id': user_id,  # Укажите chat_id группы
             'photo': text,
@@ -101,7 +101,7 @@ async def edit_reply_markup(chat_id: int, message_id: int, reply_markup: dict):
     """
     async with aiohttp.ClientSession() as session:
         # Формируем URL для запроса
-        url = f"https://api.telegram.org/bot{config.cfg['TELEGRAM_TOKEN']}/editMessageReplyMarkup"
+        url = f"https://api.telegram.org/bot{config.config_env['TELEGRAM_TOKEN']}/editMessageReplyMarkup"
 
         # Преобразуем reply_markup в формат JSON для Telegram API
         inline_keyboard = [
@@ -130,7 +130,7 @@ async def delete_message(chat_id: int, message_id: int):
     :param message_id: ID сообщения, которое нужно удалить.
     """
     async with aiohttp.ClientSession() as session:
-        url = f"https://api.telegram.org/bot{config.cfg['TELEGRAM_TOKEN']}/deleteMessage"
+        url = f"https://api.telegram.org/bot{config.config_env['TELEGRAM_TOKEN']}/deleteMessage"
         payload = {
             'chat_id': chat_id,
             'message_id': message_id
@@ -156,7 +156,7 @@ async def create_invite_link(chat_id: int, name: str = None, expire_date: int = 
     :return: Словарь с результатом или None при ошибке.
     """
     async with aiohttp.ClientSession() as session:
-        url = f"https://api.telegram.org/bot{config.cfg['TELEGRAM_TOKEN']}/createChatInviteLink"
+        url = f"https://api.telegram.org/bot{config.config_env['TELEGRAM_TOKEN']}/createChatInviteLink"
         payload = {
             'chat_id': chat_id,
             'member_limit': member_limit,
