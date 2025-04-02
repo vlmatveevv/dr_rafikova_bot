@@ -127,9 +127,12 @@ async def buy_courses_callback_handle(update: Update, context: CallbackContext) 
 async def buy_chapter_callback_handle(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
     await query.answer()
+    user_id = query.from_user.id
 
     num_of_chapter = query.data.split(':')[1]
-    course = config.courses.get(f'ch_{num_of_chapter}')
+
+    chapter_mask = f'ch_{num_of_chapter}'
+    course = config.courses.get(chapter_mask)
 
     if not course:
         await query.edit_message_text("Раздел не найден.")
@@ -141,10 +144,22 @@ async def buy_chapter_callback_handle(update: Update, context: CallbackContext) 
         name=course['name']
     )
 
-    keyboard = [
-        [InlineKeyboardButton(config.bot_btn['go_to_pay'], callback_data=f'pay_chapter:{num_of_chapter}')],
-        [InlineKeyboardButton(config.bot_btn['go_back'], callback_data='buy_courses')]
-    ]
+    # user_has_paid_course = pdb.has_paid_course(user_id, chapter_mask)
+    user_has_paid_course = True
+    keyboard = []
+
+    if user_has_paid_course:
+        keyboard.append([
+            InlineKeyboardButton(config.bot_btn['go_to_channel'], url=course['channel_invite_link'])
+        ])
+    else:
+        keyboard.append([
+            InlineKeyboardButton(config.bot_btn['go_to_pay'], callback_data=f'pay_chapter:{num_of_chapter}')
+        ])
+
+    keyboard.append([
+        InlineKeyboardButton(config.bot_btn['go_back'], callback_data='buy_courses')
+    ])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text(
@@ -178,7 +193,8 @@ async def pay_chapter_callback_handle(update: Update, context: CallbackContext) 
         text="📄 Я ознакомился и принимаю условия Публичной оферты.\n\n"
              f"[Открыть оферту]({config.other_cfg['links']['offer']})",
         reply_markup=reply_markup,
-        parse_mode=ParseMode.MARKDOWN
+        parse_mode=ParseMode.HTML,
+        disable_web_page_preview=True
     )
     return AGREE_OFFER
 
@@ -195,7 +211,8 @@ async def handle_offer_agree(update: Update, context: CallbackContext) -> int:
         text="🔐 Я даю согласие на обработку моих персональных данных.\n\n"
              f"[Политика обработки данных]({config.other_cfg['links']['privacy']})",
         reply_markup=reply_markup,
-        parse_mode=ParseMode.MARKDOWN
+        parse_mode=ParseMode.HTML,
+        disable_web_page_preview=True
     )
     return AGREE_PRIVACY
 
@@ -215,7 +232,8 @@ async def handle_privacy_agree(update: Update, context: CallbackContext) -> int:
         text="📬 Я даю согласие на получение рекламной и информационной рассылки.\n\n"
              f"[Документ о рассылке]({config.other_cfg['links']['consent']})",
         reply_markup=reply_markup,
-        parse_mode=ParseMode.MARKDOWN
+        parse_mode=ParseMode.HTML,
+        disable_web_page_preview=True
     )
     return AGREE_NEWSLETTER
 
