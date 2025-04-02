@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import logging
 import config
+import telegram_https
 from fastapi import Request
 from setup import pdb, moscow_tz
 from datetime import datetime
@@ -27,4 +28,16 @@ async def yookassa_webhook(request: Request, background_tasks: BackgroundTasks):
     data = await request.json()
     payment_object = data.get('object', {})
     payment_id = payment_object.get('id')
+    user_id = int(payment_object.get('metadata', {}).get('user_id'))
+    chapter = payment_object.get('metadata', {}).get('chapter', '')
+    course = config.courses.get(chapter)
+
+    channel_id = course['channel_id']
+    channel_invite_url = await telegram_https.create_invite_link(
+        chat_id=channel_id
+    )
+    await telegram_https.send_message(
+        user_id=user_id,
+        text=channel_invite_url
+    )
     return {"status": "ok"}

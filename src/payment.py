@@ -23,6 +23,7 @@ async def create_payment(price, user_id, num_of_chapter):
         "metadata": {
             "type": "self",
             "user_id": user_id,
+            "chapter": course,
         },
         "receipt": {
             "customer": {
