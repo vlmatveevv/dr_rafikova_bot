@@ -30,6 +30,8 @@ from telegram.ext import (
     AIORateLimiter,
     filters)
 
+import payment
+
 # Установка русской локали
 locale.setlocale(locale.LC_TIME, ('ru_RU', 'UTF-8'))
 
@@ -202,9 +204,10 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
         num=num,
         price=course['price'],
     )
+    payment_url = payment.create_payment(price=course['price'], user_id=user_id, num_of_chapter=num)
 
     keyboard = [
-        [InlineKeyboardButton("✅ Подтвердить и оплатить", url="https://example.com/payment-link")],
+        [InlineKeyboardButton("✅ Подтвердить и оплатить", url=payment_url)],
         [InlineKeyboardButton("✅ Вступить в канал", url=course['link'])],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)

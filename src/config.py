@@ -20,5 +20,6 @@ cfg = read_yaml_file(config_dir.joinpath("config.yml"))
 bot_msg = read_yaml_file(config_dir.joinpath("bot_messages.yml"))
 bot_btn = read_yaml_file(config_dir.joinpath("bot_buttons.yml"))
 courses = read_yaml_file(data_dir.joinpath("courses.yml"))
+other_cfg = read_yaml_file(data_dir.joinpath("other.yml"))
 
 config_env = dotenv.dotenv_values(config_dir / ".env")
