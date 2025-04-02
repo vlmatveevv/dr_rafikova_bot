@@ -198,7 +198,7 @@ async def pay_chapter_callback_handle(update: Update, context: CallbackContext) 
 
     await query.edit_message_text(
         text="📄 Я ознакомился и принимаю условия Публичной оферты.\n\n"
-             f"[Открыть оферту]({config.other_cfg['links']['offer']})",
+             f'<a href="{config.other_cfg["links"]["offer"]}">Открыть оферту</a>',
         reply_markup=reply_markup,
         parse_mode=ParseMode.HTML,
         disable_web_page_preview=True
@@ -219,8 +219,8 @@ async def handle_offer_agree(update: Update, context: CallbackContext) -> int:
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await query.edit_message_text(
-        text="🔐 Я даю согласие на обработку моих персональных данных.\n\n"
-             f"[Политика обработки данных]({config.other_cfg['links']['privacy']})",
+        text='🔐 Я даю согласие на обработку моих персональных данных.\n\n'
+             f'<a href="{config.other_cfg["links"]["privacy"]}">Политика обработки данных</a>',
         reply_markup=reply_markup,
         parse_mode=ParseMode.HTML,
         disable_web_page_preview=True
@@ -242,7 +242,7 @@ async def handle_privacy_agree(update: Update, context: CallbackContext) -> int:
 
     await query.edit_message_text(
         text="📬 Я даю согласие на получение рекламной и информационной рассылки.\n\n"
-             f"[Документ о рассылке]({config.other_cfg['links']['consent']})",
+             f'<a href="{config.other_cfg["links"]["consent"]}">Документ о рассылке</a>',
         reply_markup=reply_markup,
         parse_mode=ParseMode.HTML,
         disable_web_page_preview=True
@@ -443,6 +443,7 @@ def run():
     application.add_handler(CommandHandler('start', register))
     application.add_handler(CallbackQueryHandler(buy_courses_callback_handle, pattern="^buy_courses$"))
     application.add_handler(CallbackQueryHandler(buy_chapter_callback_handle, pattern="^buy_chapter:"))
+    application.add_handler(CallbackQueryHandler(upd_payment_url_handle, pattern="^upd_payment_url:"))
     application.add_handler(buy_course_conversation)
     application.add_handler(ChatJoinRequestHandler(handle_join_request))
 
