@@ -7,6 +7,7 @@ import telegram_https
 from fastapi import Request
 from setup import pdb, moscow_tz
 from datetime import datetime
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 # Настройка логгера
 logging.basicConfig(level=logging.INFO)
@@ -33,8 +34,15 @@ async def yookassa_webhook(request: Request, background_tasks: BackgroundTasks):
     course = config.courses.get(chapter)
 
     channel_invite_url = course['channel_invite_link']
+
+    keyboard = [
+        [InlineKeyboardButton("Вступить в канал ✅", url=channel_invite_url)],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
     await telegram_https.send_message(
         user_id=user_id,
-        text=channel_invite_url
+        text=channel_invite_url,
+        reply_markup=reply_markup
     )
     return {"status": "ok"}

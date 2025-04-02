@@ -5,7 +5,7 @@ Configuration.account_id = config.config_env['SHOP_ID']
 Configuration.secret_key = config.config_env['SECRET_KEY']
 
 
-async def create_payment(price, user_id, num_of_chapter):
+async def create_payment(price, user_id, email, num_of_chapter):
     formatted_chapter = f'ch_{num_of_chapter}'
     course = config.courses.get(formatted_chapter)
     name = course['name']
@@ -28,7 +28,7 @@ async def create_payment(price, user_id, num_of_chapter):
         },
         "receipt": {
             "customer": {
-                "email": "ya.matveev116@ya.ru"
+                "email": email
             },
             "items": [
                 {

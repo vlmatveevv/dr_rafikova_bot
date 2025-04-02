@@ -64,31 +64,33 @@ class Database:
             self.conn.rollback()  # Откат транзакции в случае ошибки
             return False
 
-    def add_payment(self, payment_id: str, amount: float, income_amount: float,
-                    payment_method_type: str, user_id: int, status: str,
-                    order_id: int) -> bool:
+    def add_payment(self, external_payment_id: str, amount: float, income_amount: float,
+                    payment_method_type: str, order_id: int) -> bool:
         """
         Добавляет новый платеж в таблицу payments.
 
-        :param payment_id: Уникальный идентификатор платежа (VARCHAR).
-        :param amount: Сумма платежа (NUMERIC(8,2)).
-        :param income_amount: Сумма, фактически поступившая на счет (NUMERIC(8,2)).
-        :param payment_method_type: Тип платежного метода (например, 'card', 'cash').
-        :param user_id: ID пользователя.
-        :param status: Статус платежа (например, 'pending', 'completed').
+        :param external_payment_id: Уникальный ID платежа от платёжной системы.
+        :param amount: Сумма платежа.
+        :param income_amount: Сумма после вычета комиссии.
+        :param payment_method_type: Тип платежного метода (например, 'card', 'sbp').
         :param order_id: ID заказа.
         :return: True, если платеж успешно добавлен, иначе False.
         """
         try:
             with self.conn.cursor() as cursor:
                 query = """
-                    INSERT INTO payments (payment_id, amount, income_amount, 
-                                          payment_method_type, user_id, status, 
-                                          created_at, updated_at, order_id)
-                    VALUES (%s, %s, %s, %s, %s, %s, NOW(), NOW(), %s)
+                    INSERT INTO payments (
+                        external_payment_id, amount, income_amount, 
+                        payment_method_type, order_id, created_at
+                    ) VALUES (%s, %s, %s, %s, %s, NOW())
                 """
-                params = (payment_id, amount, income_amount, payment_method_type,
-                          user_id, status, order_id)
+                params = (
+                    external_payment_id,
+                    amount,
+                    income_amount,
+                    payment_method_type,
+                    order_id
+                )
                 cursor.execute(query, params)
                 self.conn.commit()
                 return True
@@ -114,19 +116,66 @@ class Database:
             print(f"Ошибка при получении платежа по order_id {order_id}: {e}")
             return None
 
-    def payment_exists(self, payment_id: str) -> bool:
+    def payment_exists(self, external_payment_id: str) -> bool:
         """
         Проверка, существует ли платеж с данным payment_id в базе данных.
-        :param payment_id: Уникальный ID платежа
+        :param external_payment_id: Уникальный ID платежа
         :return: True, если платеж существует, иначе False
         """
         try:
             with self.conn.cursor() as cursor:
                 cursor.execute("""
-                    SELECT EXISTS(SELECT 1 FROM payments WHERE payment_id = %s)
-                """, (payment_id,))
+                    SELECT EXISTS(SELECT 1 FROM payments WHERE external_payment_id = %s)
+                """, (external_payment_id,))
                 return cursor.fetchone()[0]
         except Exception as e:
             self.conn.rollback()
             print(f"Error checking payment existence: {e}")
+            return False
+
+    def get_paid_courses_by_user(self, user_id: int) -> list:
+        """
+        Возвращает список курсов, которые пользователь успешно оплатил.
+
+        :param user_id: ID пользователя.
+        :return: Список названий курсов (course_chapter).
+        """
+        try:
+            with self.conn.cursor() as cursor:
+                query = """
+                    SELECT DISTINCT o.course_chapter
+                    FROM orders o
+                    JOIN payments p ON o.order_id = p.order_id
+                    WHERE o.user_id = %s
+                """
+                cursor.execute(query, (user_id,))
+                result = cursor.fetchall()
+                return [row[0] for row in result]  # список course_chapter
+        except Exception as e:
+            print(f"Ошибка при получении курсов: {e}")
+            return []
+
+    def has_paid_course(self, user_id: int, course_chapter: str) -> bool:
+        """
+        Проверяет, оплатил ли пользователь указанный курс.
+
+        :param user_id: ID пользователя.
+        :param course_chapter: Название курса/раздела.
+        :return: True, если оплата есть, иначе False.
+        """
+        try:
+            with self.conn.cursor() as cursor:
+                query = """
+                    SELECT EXISTS (
+                        SELECT 1
+                        FROM orders o
+                        JOIN payments p ON o.order_id = p.order_id
+                        WHERE o.user_id = %s AND o.course_chapter = %s
+                    )
+                """
+                cursor.execute(query, (user_id, course_chapter))
+                result = cursor.fetchone()
+                return result[0]  # True или False
+        except Exception as e:
+            print(f"Ошибка при проверке оплаты курса: {e}")
             return False
