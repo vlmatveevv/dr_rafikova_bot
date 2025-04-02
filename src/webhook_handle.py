@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import logging
 import config
+import payment
 import telegram_https
 from fastapi import Request
 from setup import pdb, moscow_tz
@@ -29,11 +30,19 @@ async def yookassa_webhook(request: Request, background_tasks: BackgroundTasks):
     data = await request.json()
     payment_object = data.get('object', {})
     payment_id = payment_object.get('id')
+    amount = float(payment_object.get('amount', {}).get('value'))
+    income_amount = float(
+        payment_object.get('income_amount', {}).get('value', 0.0))  # Обработка, если income_amount отсутствует
+    payment_method_type = payment_object.get('payment_method', {}).get('type', 'test')
+
     user_id = int(payment_object.get('metadata', {}).get('user_id'))
     chapter = payment_object.get('metadata', {}).get('chapter', '')
     course = config.courses.get(chapter)
 
     channel_invite_url = course['channel_invite_link']
+
+    await pdb.add_payment(external_payment_id=payment_id, amount=amount, income_amount=income_amount,
+                          payment_method_type=payment_method_type, order_id=order_id)
 
     keyboard = [
         [InlineKeyboardButton("Вступить в канал ✅", url=channel_invite_url)],

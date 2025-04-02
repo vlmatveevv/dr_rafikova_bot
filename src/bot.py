@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytz
 import telegram
+import other_func
 from setup import pdb
 import config
 import yaml
@@ -30,7 +31,6 @@ from telegram.ext import (
     AIORateLimiter,
     ChatJoinRequestHandler,
     filters)
-
 
 import payment
 
@@ -144,8 +144,7 @@ async def buy_chapter_callback_handle(update: Update, context: CallbackContext) 
         name=course['name']
     )
 
-    # user_has_paid_course = pdb.has_paid_course(user_id, chapter_mask)
-    user_has_paid_course = True
+    user_has_paid_course = pdb.has_paid_course(user_id, chapter_mask)
     keyboard = []
 
     if user_has_paid_course:
@@ -174,19 +173,27 @@ async def buy_chapter_callback_handle(update: Update, context: CallbackContext) 
 async def pay_chapter_callback_handle(update: Update, context: CallbackContext) -> int:
     query = update.callback_query
     await query.answer()
+    user_id = query.from_user.id
 
     num_of_chapter = query.data.split(':')[1]
-    course = config.courses.get(f'ch_{num_of_chapter}')
+    course_mask = f'ch_{num_of_chapter}'
+    course = config.courses.get(course_mask)
 
     if not course:
         await query.edit_message_text("Курс не найден.")
         return ConversationHandler.END
 
+    order_code = other_func.generate_order_number()
+    pdb.create_order(user_id=user_id, course_chapter=course_mask, order_code=order_code)
     context.user_data['selected_course'] = course
     context.user_data['chapter_number'] = num_of_chapter
+    context.user_data['order_code'] = order_code
     context.user_data['is_in_conversation'] = True
 
-    keyboard = [[InlineKeyboardButton("✅ Принимаю", callback_data="agree_offer")]]
+    keyboard = [
+        [InlineKeyboardButton("✅ Принимаю", callback_data="agree_offer")],
+        [InlineKeyboardButton("🚫 Отмена", callback_data='cancel')]
+    ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await query.edit_message_text(
@@ -204,7 +211,11 @@ async def handle_offer_agree(update: Update, context: CallbackContext) -> int:
     query = update.callback_query
     await query.answer()
 
-    keyboard = [[InlineKeyboardButton("✅ Даю согласие", callback_data="agree_privacy")]]
+    order_code = context.user_data['order_code']
+    pdb.update_order_email_and_agreements(order_code=order_code, agreed_offer=True)
+
+    keyboard = [[InlineKeyboardButton("✅ Даю согласие", callback_data="agree_privacy")],
+                [InlineKeyboardButton("🚫 Отмена", callback_data='cancel')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await query.edit_message_text(
@@ -221,10 +232,11 @@ async def handle_offer_agree(update: Update, context: CallbackContext) -> int:
 async def handle_privacy_agree(update: Update, context: CallbackContext) -> int:
     query = update.callback_query
     await query.answer()
-
+    order_code = context.user_data['order_code']
+    pdb.update_order_email_and_agreements(order_code=order_code, agreed_privacy=True)
     keyboard = [
         [InlineKeyboardButton("✅ Я согласен", callback_data="agree_newsletter")],
-        [InlineKeyboardButton("Я не согласен", callback_data="skip_newsletter")]
+        [InlineKeyboardButton("🚫 Отмена", callback_data='cancel')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -243,7 +255,14 @@ async def handle_newsletter_agree(update: Update, context: CallbackContext) -> i
     query = update.callback_query
     await query.answer()
 
-    email_msg = await query.edit_message_text("📧 Введите ваш e-mail для отправки чека:")
+    order_code = context.user_data['order_code']
+    pdb.update_order_email_and_agreements(order_code=order_code, agreed_newsletter=True)
+    keyboard = [
+        [InlineKeyboardButton("🚫 Отмена", callback_data='cancel')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    email_msg = await query.edit_message_text(text="📧 Введите ваш e-mail для отправки чека:",
+                                              reply_markup=reply_markup)
     context.user_data['email_msg'] = email_msg
     return ASK_EMAIL
 
@@ -254,9 +273,16 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
     email = update.message.text.strip()
 
     if not is_valid_email(email):
-        await update.message.reply_text("Некорректный e-mail. Пожалуйста, введите корректный e-mail:")
+        keyboard = [
+            [InlineKeyboardButton("🚫 Отмена", callback_data='cancel')]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text(text="Некорректный e-mail. Пожалуйста, введите корректный e-mail:",
+                                        reply_markup=reply_markup)
         return ASK_EMAIL
 
+    order_code = context.user_data['order_code']
+    pdb.update_order_email_and_agreements(order_code=order_code, email=email)
     context.user_data['email'] = email
     email_msg = context.user_data.get('email_msg')
     user_id = update.effective_user.id
@@ -285,7 +311,11 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
         num_of_chapter=num
     )
 
-    keyboard = [[InlineKeyboardButton("✅ Подтвердить и оплатить", url=payment_url)]]
+    keyboard = [
+        [InlineKeyboardButton("✅ Подтвердить и оплатить", url=payment_url)],
+        [InlineKeyboardButton("🔄 Обновить платежную ссылку", callback_data=f'upd_payment_url:{order_code}')],
+        [InlineKeyboardButton("🚫 Отмена", callback_data='cancel')]
+    ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.chat.send_message(
@@ -304,8 +334,48 @@ async def cancel_payment_handle(update: Update, context: CallbackContext) -> int
     await query.answer()
 
     context.user_data.clear()
-    await query.edit_message_text("Покупка отменена.")
+    keyboard = [
+        [InlineKeyboardButton("📲 Главное меню", callback_data='main_menu')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(text="Покупка отменена. Возвращайтесь позже.",
+                                  reply_markup=reply_markup)
     return ConversationHandler.END
+
+
+async def upd_payment_url_handle(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    await query.answer()
+    data = query.data
+
+    order_code = data.split(':')[1]
+    order_data = pdb.get_order_by_code(int(order_code))
+
+    course = config.courses.get(order_data['course_chapter'])
+    user_id = order_data['user_id']
+    email = order_data['email']
+    num = order_data['course_chapter'].split('_')[1]
+
+    payment_url = await payment.create_payment(
+        price=course['price'],
+        user_id=user_id,
+        email=email,
+        num_of_chapter=num
+    )
+
+    keyboard = [
+        [InlineKeyboardButton("✅ Подтвердить и оплатить", url=payment_url)]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(
+        text=config.bot_msg['confirm_purchase'].format(
+            email=email,
+            name=course['name'],
+            num=num,
+            price=course['price'],
+        ),
+        reply_markup=reply_markup
+    )
 
 
 async def handle_join_request(update: Update, context: CallbackContext):
@@ -343,12 +413,13 @@ buy_course_conversation = ConversationHandler(
     states={
         AGREE_OFFER: [CallbackQueryHandler(handle_offer_agree, pattern="^agree_offer$")],
         AGREE_PRIVACY: [CallbackQueryHandler(handle_privacy_agree, pattern="^agree_privacy$")],
-        AGREE_NEWSLETTER: [CallbackQueryHandler(handle_newsletter_agree, pattern="^(agree_newsletter|skip_newsletter)$")],
+        AGREE_NEWSLETTER: [CallbackQueryHandler(handle_newsletter_agree, pattern="^agree_newsletter$")],
         ASK_EMAIL: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_email_handle)],
     },
     fallbacks=[CallbackQueryHandler(cancel_payment_handle, pattern="^cancel$")],
     allow_reentry=True
 )
+
 
 def run():
     # Создание экземпляра RateLimiter

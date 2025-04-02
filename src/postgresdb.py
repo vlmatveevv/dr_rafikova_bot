@@ -179,3 +179,108 @@ class Database:
         except Exception as e:
             print(f"Ошибка при проверке оплаты курса: {e}")
             return False
+
+    def create_order(self, user_id: int, course_chapter: str, order_code: int) -> int:
+        """
+        Создает заказ в таблице orders и возвращает order_id.
+        Email будет добавлен позже.
+        """
+        try:
+            with self.conn.cursor() as cursor:
+                query = """
+                    INSERT INTO orders (user_id, course_chapter, order_code)
+                    VALUES (%s, %s, %s)
+                    RETURNING order_id;
+                """
+                cursor.execute(query, (user_id, course_chapter, order_code))
+                order_id = cursor.fetchone()[0]
+                self.conn.commit()
+                return order_id
+        except Exception as e:
+            print(f"❌ Ошибка при создании заказа: {e}")
+            self.conn.rollback()
+            raise
+
+    def update_order_email_and_agreements(self,
+                                          order_code: int,
+                                          email: str = None,
+                                          agreed_offer: bool = None,
+                                          agreed_privacy: bool = None,
+                                          agreed_newsletter: bool = None) -> None:
+        """
+        Обновляет email и/или флаги согласий у заказа по order_code.
+        Только те поля, которые переданы (не None).
+        """
+        try:
+            with self.conn.cursor() as cursor:
+                fields = []
+                values = []
+
+                if email is not None:
+                    fields.append("email = %s")
+                    values.append(email)
+                if agreed_offer is not None:
+                    fields.append("agreed_offer = %s")
+                    values.append(agreed_offer)
+                if agreed_privacy is not None:
+                    fields.append("agreed_privacy = %s")
+                    values.append(agreed_privacy)
+                if agreed_newsletter is not None:
+                    fields.append("agreed_newsletter = %s")
+                    values.append(agreed_newsletter)
+
+                if not fields:
+                    # Нечего обновлять — просто выходим
+                    return
+
+                query = f"""
+                    UPDATE orders
+                    SET {', '.join(fields)},
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE order_code = %s
+                """
+                values.append(order_code)
+
+                cursor.execute(query, tuple(values))
+                self.conn.commit()
+        except Exception as e:
+            print(f"❌ Ошибка при обновлении заказа: {e}")
+            self.conn.rollback()
+            raise
+
+    def check_order_code_unique(self, order_code: int) -> bool:
+        """
+        Проверяет, существует ли order_code в таблице orders.
+        :param order_code: Номер заказа, который нужно проверить
+        :return: True, если код уникален, иначе False
+        """
+        try:
+            with self.conn.cursor() as cursor:
+                query = """
+                    SELECT COUNT(*)
+                    FROM orders
+                    WHERE order_code = %s
+                """
+                cursor.execute(query, (order_code,))
+                count = cursor.fetchone()[0]
+                return count == 0  # True, если код не найден
+        except Exception as e:
+            print(f"Error checking order code uniqueness: {e}")
+            return False  # В случае ошибки считаем код не уникальным
+
+    def get_order_by_code(self, order_code: int):
+        """
+        Получение информации о заказе по order_id.
+        :param order_code: Уникальный код заказа.
+        :return: Словарь с данными заказа или None.
+        """
+        try:
+            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute("""
+                    SELECT * FROM orders WHERE order_code = %s
+                """, (order_code,))
+                return cursor.fetchone()
+        except Exception as e:
+            self.conn.rollback()
+            print(f"Error getting order: {e}")
+            return None
