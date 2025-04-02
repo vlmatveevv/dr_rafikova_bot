@@ -252,6 +252,7 @@ async def handle_join_request(update: Update, context: CallbackContext):
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await context.bot.send_message(
+            chat_id=user_id,
             text="Для перехода в канал нажмите на кнопку ниже",
             reply_markup=reply_markup
         )
