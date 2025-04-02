@@ -64,7 +64,7 @@ logger_for_httpx = logging.getLogger('httpx')
 # Установите уровень логирования на WARNING, чтобы скрыть INFO и DEBUG сообщения
 logger_for_httpx.setLevel(logging.WARNING)
 
-ASK_EMAIL = 1
+AGREE_OFFER, AGREE_PRIVACY, AGREE_NEWSLETTER, ASK_EMAIL = range(4)
 
 
 # Обработка ввода email
@@ -167,34 +167,82 @@ async def pay_chapter_callback_handle(update: Update, context: CallbackContext) 
         await query.edit_message_text("Курс не найден.")
         return ConversationHandler.END
 
-    # Сохраняем данные и флаг активности
     context.user_data['selected_course'] = course
     context.user_data['chapter_number'] = num_of_chapter
     context.user_data['is_in_conversation'] = True
 
-    email_msg = await query.edit_message_text("Введите ваш e-mail для отправки чека:")
-    context.user_data['email_msg'] = email_msg
+    keyboard = [[InlineKeyboardButton("✅ Принимаю", callback_data="agree_offer")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
 
+    await query.edit_message_text(
+        text="📄 Я ознакомился и принимаю условия Публичной оферты.\n\n"
+             f"[Открыть оферту]({config.other_cfg['links']['offer']})",
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.MARKDOWN
+    )
+    return AGREE_OFFER
+
+
+# Шаг 2 — согласие на обработку ПДн
+async def handle_offer_agree(update: Update, context: CallbackContext) -> int:
+    query = update.callback_query
+    await query.answer()
+
+    keyboard = [[InlineKeyboardButton("✅ Даю согласие", callback_data="agree_privacy")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await query.edit_message_text(
+        text="🔐 Я даю согласие на обработку моих персональных данных.\n\n"
+             f"[Политика обработки данных]({config.other_cfg['links']['privacy']})",
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.MARKDOWN
+    )
+    return AGREE_PRIVACY
+
+
+# Шаг 3 — согласие на рассылку
+async def handle_privacy_agree(update: Update, context: CallbackContext) -> int:
+    query = update.callback_query
+    await query.answer()
+
+    keyboard = [
+        [InlineKeyboardButton("✅ Я согласен", callback_data="agree_newsletter")],
+        [InlineKeyboardButton("Я не согласен", callback_data="skip_newsletter")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await query.edit_message_text(
+        text="📬 Я даю согласие на получение рекламной и информационной рассылки.\n\n"
+             f"[Документ о рассылке]({config.other_cfg['links']['consent']})",
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.MARKDOWN
+    )
+    return AGREE_NEWSLETTER
+
+
+# Шаг 4 — e-mail
+async def handle_newsletter_agree(update: Update, context: CallbackContext) -> int:
+    query = update.callback_query
+    await query.answer()
+
+    email_msg = await query.edit_message_text("📧 Введите ваш e-mail для отправки чека:")
+    context.user_data['email_msg'] = email_msg
     return ASK_EMAIL
 
 
-# Обработка ввода email
+# Шаг 5 — обработка e-mail и оплата
 async def ask_email_handle(update: Update, context: CallbackContext) -> int:
     logger.info("📨 Получен email от пользователя")
     email = update.message.text.strip()
 
-    # Проверка email
     if not is_valid_email(email):
-        await update.message.reply_text(
-            "Некорректный e-mail. Пожалуйста, введите корректный e-mail:"
-        )
-        return ASK_EMAIL  # Остаёмся в текущем состоянии для повторного ввода
+        await update.message.reply_text("Некорректный e-mail. Пожалуйста, введите корректный e-mail:")
+        return ASK_EMAIL
 
     context.user_data['email'] = email
     email_msg = context.user_data.get('email_msg')
     user_id = update.effective_user.id
 
-    # Удаляем сообщение с запросом email и сам ввод пользователя
     try:
         if email_msg:
             await context.bot.delete_message(chat_id=user_id, message_id=email_msg.message_id)
@@ -204,7 +252,6 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
 
     course = context.user_data['selected_course']
     num = context.user_data['chapter_number']
-    email = context.user_data['email']
 
     text = config.bot_msg['confirm_purchase'].format(
         email=email,
@@ -212,11 +259,15 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
         num=num,
         price=course['price'],
     )
-    payment_url = await payment.create_payment(price=course['price'], user_id=user_id, email=email, num_of_chapter=num)
 
-    keyboard = [
-        [InlineKeyboardButton("✅ Подтвердить и оплатить", url=payment_url)],
-    ]
+    payment_url = await payment.create_payment(
+        price=course['price'],
+        user_id=user_id,
+        email=email,
+        num_of_chapter=num
+    )
+
+    keyboard = [[InlineKeyboardButton("✅ Подтвердить и оплатить", url=payment_url)]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.chat.send_message(
@@ -224,11 +275,12 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
         reply_markup=reply_markup,
         parse_mode=ParseMode.HTML
     )
+
     context.user_data.clear()
     return ConversationHandler.END
 
 
-# Отмена покупки
+# Отмена
 async def cancel_payment_handle(update: Update, context: CallbackContext) -> int:
     query = update.callback_query
     await query.answer()
@@ -269,14 +321,16 @@ async def handle_join_request(update: Update, context: CallbackContext):
 
 
 buy_course_conversation = ConversationHandler(
-    entry_points=[CallbackQueryHandler(pay_chapter_callback_handle, pattern=r'^pay_chapter:\d+$')],
+    entry_points=[CallbackQueryHandler(pay_chapter_callback_handle, pattern="^pay_chapter:")],
     states={
+        AGREE_OFFER: [CallbackQueryHandler(handle_offer_agree, pattern="^agree_offer$")],
+        AGREE_PRIVACY: [CallbackQueryHandler(handle_privacy_agree, pattern="^agree_privacy$")],
+        AGREE_NEWSLETTER: [CallbackQueryHandler(handle_newsletter_agree, pattern="^(agree_newsletter|skip_newsletter)$")],
         ASK_EMAIL: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_email_handle)],
     },
-    fallbacks=[CallbackQueryHandler(cancel_payment_handle, pattern='^cancel_payment$')],
+    fallbacks=[CallbackQueryHandler(cancel_payment_handle, pattern="^cancel$")],
     allow_reentry=True
 )
-
 
 def run():
     # Создание экземпляра RateLimiter
