@@ -204,7 +204,7 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
         num=num,
         price=course['price'],
     )
-    payment_url = payment.create_payment(price=course['price'], user_id=user_id, num_of_chapter=num)
+    payment_url = await payment.create_payment(price=course['price'], user_id=user_id, num_of_chapter=num)
 
     keyboard = [
         [InlineKeyboardButton("✅ Подтвердить и оплатить", url=payment_url)],
