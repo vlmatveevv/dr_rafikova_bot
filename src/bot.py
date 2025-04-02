@@ -243,7 +243,13 @@ async def handle_join_request(update: Update, context: CallbackContext):
     user_id = join_request.from_user.id
     chat_id = update.chat_join_request.chat.id
 
-    channel_invite_link = config.channel_map.get(chat_id)
+    channel_data = config.channel_map.get(chat_id)
+
+    if channel_data:
+        name = channel_data.get('name')
+        channel_invite_link = channel_data.get('channel_invite_link')
+    else:
+        return
 
     if user_id in allowed_users:
         await join_request.approve()
@@ -253,7 +259,7 @@ async def handle_join_request(update: Update, context: CallbackContext):
         reply_markup = InlineKeyboardMarkup(keyboard)
         await context.bot.send_message(
             chat_id=user_id,
-            text="Для перехода в канал нажмите на кнопку ниже",
+            text=f"Для перехода в канал ({name}) нажмите на кнопку ниже",
             reply_markup=reply_markup
         )
         logger.info(f"✅ Одобрен вход для {allowed_users[user_id]} ({user_id})")

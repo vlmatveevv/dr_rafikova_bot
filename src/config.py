@@ -30,6 +30,10 @@ channel_map = {}
 for key, value in courses.items():
     if isinstance(value, dict):
         channel_id = value.get('channel_id')
-        invite_link = value.get('channel_invite_link')
-        if channel_id and invite_link:
-            channel_map[channel_id] = invite_link
+        channel_invite_link = value.get('channel_invite_link')
+        name = value.get('name')
+        if channel_id and channel_invite_link and name:
+            channel_map[channel_id] = {
+                'name': name,
+                'channel_invite_link': channel_invite_link
+            }
