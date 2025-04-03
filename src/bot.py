@@ -598,6 +598,7 @@ def run():
     application.add_handler(CallbackQueryHandler(buy_chapter_callback_handle, pattern="^buy_chapter:"))
     application.add_handler(CallbackQueryHandler(upd_payment_url_handle, pattern="^upd_payment_url:"))
 
+    application.add_handler(CallbackQueryHandler(main_menu_callback_handle, pattern="^main_menu$"))
     application.add_handler(CallbackQueryHandler(my_courses_callback_handle, pattern="^my_courses$"))
     application.add_handler(CallbackQueryHandler(all_courses_callback_handle, pattern="^all_courses$"))
     application.add_handler(CallbackQueryHandler(documents_callback_handle, pattern="^documents$"))
