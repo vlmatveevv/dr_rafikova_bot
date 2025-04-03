@@ -15,6 +15,7 @@ import other_func
 from setup import pdb
 import config
 import yaml
+import keyboard as my_keyboard
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, BotCommand, ReplyKeyboardMarkup, \
     ReplyKeyboardRemove, KeyboardButton, InputMediaPhoto, InputMediaDocument
 from telegram.constants import ParseMode, ChatAction
@@ -78,6 +79,44 @@ async def user_exists_pdb(user_id: int) -> bool:
     return pdb.user_exists(user_id)
 
 
+async def send_or_edit_message(update: Update, context: CallbackContext, text: str,
+                               reply_markup: InlineKeyboardMarkup = None, new_message=False):
+    if new_message:
+        await context.bot.send_message(
+            chat_id=update.effective_user.id,
+            text=text,
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.HTML,
+            disable_web_page_preview=True
+        )
+        return
+    if update.callback_query:
+        if update.callback_query.message.text:
+            await update.callback_query.edit_message_text(
+                text=text,
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.HTML,
+                disable_web_page_preview=True
+            )
+        else:
+            await update.callback_query.message.delete()
+            await context.bot.send_message(
+                chat_id=update.effective_user.id,
+                text=text,
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.HTML,
+                disable_web_page_preview=True
+            )
+    else:
+        await context.bot.send_message(
+            chat_id=update.effective_user.id,
+            text=text,
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.HTML,
+            disable_web_page_preview=True
+        )
+
+
 async def register(update: Update, context: CallbackContext) -> int:
     user_id = update.effective_user.id
     first_name = update.effective_user.first_name or ""
@@ -108,7 +147,12 @@ async def my_courses_command(update: Update, context: CallbackContext) -> None:
     paid_courses = pdb.get_paid_courses_by_user(user_id)
 
     if not paid_courses:
-        await update.message.reply_text("У вас пока нет оплаченных курсов.")
+        text = "У вас пока нет оплаченных курсов."
+        keyboard = [
+            [InlineKeyboardButton("📲 Главное меню", callback_data="main_menu")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await send_or_edit_message(update, context, text, reply_markup)
         return
 
     keyboard = []
@@ -124,9 +168,67 @@ async def my_courses_command(update: Update, context: CallbackContext) -> None:
 
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    await update.message.reply_text(
-        "Ваши оплаченные курсы. Нажмите, чтобы перейти:",
-        reply_markup=reply_markup
+    text = "Ваши оплаченные курсы. Нажмите, чтобы перейти:"
+    await send_or_edit_message(update, context, text, reply_markup)
+
+
+async def my_courses_callback_handle(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    await query.answer()
+    await my_courses_command(update, context)
+
+
+
+async def all_courses_command(update: Update, context: CallbackContext) -> None:
+    keyboard = []
+
+    for key, course in config.courses.items():
+        num_of_chapter = key.split('_')[1]
+        button = InlineKeyboardButton(
+            text=course['name'],
+            callback_data=f'buy_chapter:{num_of_chapter}'
+        )
+        keyboard.append([button])
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    text = config.bot_msg['choose_chapter']
+    await send_or_edit_message(update, context, text, reply_markup)
+
+
+async def all_courses_callback_handle(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    await query.answer()
+    await all_courses_command(update, context)
+
+
+async def documents_command(update: Update, context: CallbackContext) -> None:
+    user_id = update.effective_user.id
+    offer_text = f'<a href="{config.other_cfg["links"]["offer"]}">Ознакомиться с офертой</a>'
+    privacy_text = f'<a href="{config.other_cfg["links"]["privacy"]}">Ознакомиться с политика обработки персональных данных</a>'
+    consent_text = f'<a href="{config.other_cfg["links"]["consent"]}">Ознакомиться с документом на получение рекламной и информационной рассылки</a>'
+    chargeback_text = f'<a href="{config.other_cfg["links"]["consent"]}">Ознакомиться с заявление на возврат денежных средств</a>'
+    text = offer_text + "\n\n" + privacy_text + "\n\n" + consent_text + "\n\n" + chargeback_text
+
+    keyboard = [
+        [InlineKeyboardButton("📲 Главное меню", callback_data="main_menu")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await send_or_edit_message(update, context, text, reply_markup)
+
+
+async def documents_callback_handle(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    await query.answer()
+    await documents_command(update, context)
+
+
+async def main_menu_callback_handle(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text(
+        text="📲 Главное меню",
+        reply_markup=my_keyboard.main_menu_button_markup(),
+        parse_mode=ParseMode.HTML
     )
 
 
@@ -445,6 +547,16 @@ async def handle_join_request(update: Update, context: CallbackContext):
         logger.info(f"❌ Отклонён вход для неизвестного пользователя {user_id}")
 
 
+async def post_init(application: Application) -> None:
+    # Подгружаем команды из main_menu
+    menu_commands = [
+        BotCommand(f"/{key}", value) for key, value in config.bot_btn['main_menu'].items()
+    ]
+
+    # Устанавливаем только эти 3 команды
+    await application.bot.set_my_commands(menu_commands)
+
+
 buy_course_conversation = ConversationHandler(
     entry_points=[CallbackQueryHandler(pay_chapter_callback_handle, pattern="^pay_chapter:")],
     states={
@@ -479,9 +591,17 @@ def run():
 
     application.add_handler(CommandHandler('start', register))
     application.add_handler(CommandHandler('my_courses', my_courses_command))
+    application.add_handler(CommandHandler('all_courses', all_courses_command))
+    application.add_handler(CommandHandler('documents', documents_command))
+
     application.add_handler(CallbackQueryHandler(buy_courses_callback_handle, pattern="^buy_courses$"))
     application.add_handler(CallbackQueryHandler(buy_chapter_callback_handle, pattern="^buy_chapter:"))
     application.add_handler(CallbackQueryHandler(upd_payment_url_handle, pattern="^upd_payment_url:"))
+
+    application.add_handler(CallbackQueryHandler(my_courses_callback_handle, pattern="^my_courses$"))
+    application.add_handler(CallbackQueryHandler(all_courses_callback_handle, pattern="^all_courses$"))
+    application.add_handler(CallbackQueryHandler(documents_callback_handle, pattern="^documents$"))
+
     application.add_handler(buy_course_conversation)
     application.add_handler(ChatJoinRequestHandler(handle_join_request))
 
