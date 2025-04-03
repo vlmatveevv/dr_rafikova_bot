@@ -101,6 +101,35 @@ async def register(update: Update, context: CallbackContext) -> int:
     return ConversationHandler.END
 
 
+async def my_courses_command(update: Update, context: CallbackContext) -> None:
+    user_id = update.effective_user.id
+
+    # Получаем список оплаченных курсов
+    paid_courses = pdb.get_paid_courses_by_user(user_id)
+
+    if not paid_courses:
+        await update.message.reply_text("У вас пока нет оплаченных курсов.")
+        return
+
+    keyboard = []
+
+    for course_key in paid_courses:
+        course = config.courses.get(course_key)
+        if course:
+            button = InlineKeyboardButton(
+                text=course["name"],
+                url=course["channel_invite_link"]
+            )
+            keyboard.append([button])  # каждая кнопка в новой строке
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text(
+        "Ваши оплаченные курсы. Нажмите, чтобы перейти:",
+        reply_markup=reply_markup
+    )
+
+
 # Покупка курсов (список)
 async def buy_courses_callback_handle(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
@@ -449,6 +478,7 @@ def run():
     )
 
     application.add_handler(CommandHandler('start', register))
+    application.add_handler(CommandHandler('my_courses', my_courses_command))
     application.add_handler(CallbackQueryHandler(buy_courses_callback_handle, pattern="^buy_courses$"))
     application.add_handler(CallbackQueryHandler(buy_chapter_callback_handle, pattern="^buy_chapter:"))
     application.add_handler(CallbackQueryHandler(upd_payment_url_handle, pattern="^upd_payment_url:"))

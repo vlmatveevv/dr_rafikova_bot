@@ -30,6 +30,12 @@ async def yookassa_webhook(request: Request, background_tasks: BackgroundTasks):
     data = await request.json()
     payment_object = data.get('object', {})
     payment_id = payment_object.get('id')
+
+    # Проверяем, был ли платеж уже обработан
+    if pdb.payment_exists(payment_id):
+        logger.info(f"Payment {payment_id} already processed. Skipping.")
+        return {"status": "ok"}
+
     amount = float(payment_object.get('amount', {}).get('value'))
     income_amount = float(
         payment_object.get('income_amount', {}).get('value', 0.0))  # Обработка, если income_amount отсутствует
@@ -41,6 +47,7 @@ async def yookassa_webhook(request: Request, background_tasks: BackgroundTasks):
     course = config.courses.get(chapter)
 
     channel_invite_url = course['channel_invite_link']
+    channel_name = course['name']
 
     pdb.add_payment(external_payment_id=payment_id, amount=amount, income_amount=income_amount,
                           payment_method_type=payment_method_type, order_id=order_id)
@@ -52,7 +59,7 @@ async def yookassa_webhook(request: Request, background_tasks: BackgroundTasks):
 
     await telegram_https.send_message(
         user_id=user_id,
-        text="Для вступления в канал нажмите на кнопку ниже",
+        text=f"Для вступления в канал <b>({channel_name}</b> нажмите на кнопку ниже",
         reply_markup=reply_markup
     )
     return {"status": "ok"}
