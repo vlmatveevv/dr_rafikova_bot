@@ -37,3 +37,9 @@ for key, value in courses.items():
                 'name': name,
                 'channel_invite_link': channel_invite_link
             }
+
+channel_id_to_key = {
+    value["channel_id"]: key
+    for key, value in courses.items()
+    if isinstance(value, dict) and "channel_id" in value
+}
