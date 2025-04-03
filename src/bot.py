@@ -166,10 +166,10 @@ async def my_courses_command(update: Update, context: CallbackContext) -> None:
             )
             keyboard.append([button])  # каждая кнопка в новой строке
 
-    keyboard.append(InlineKeyboardButton(
+    keyboard.append([InlineKeyboardButton(
         text="📲 Главное меню",
         callback_data='main_menu'
-    ))
+    )])
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     text = "Ваши оплаченные курсы. Нажмите, чтобы перейти:"
@@ -194,10 +194,10 @@ async def all_courses_command(update: Update, context: CallbackContext) -> None:
         )
         keyboard.append([button])
 
-    keyboard.append(InlineKeyboardButton(
+    keyboard.append([InlineKeyboardButton(
             text="📲 Главное меню",
             callback_data='main_menu'
-        ))
+        )])
     reply_markup = InlineKeyboardMarkup(keyboard)
     text = config.bot_msg['choose_chapter']
     await send_or_edit_message(update, context, text, reply_markup)
