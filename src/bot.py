@@ -540,6 +540,7 @@ async def handle_join_request(update: Update, context: CallbackContext):
         return
 
     course_key = config.channel_id_to_key.get(chat_id)
+    logger.info(f"course_key! = {course_key}")
 
     if pdb.has_paid_course(user_id=user_id, course_chapter=course_key):
         await join_request.approve()
