@@ -132,7 +132,7 @@ async def register(update: Update, context: CallbackContext) -> int:
 
     await context.bot.send_message(
         chat_id=user_id,
-        text=f"Hello, {first_name}",
+        text=f"{config.bot_msg['hello'].format(first_name=first_name)}",
         reply_markup=reply_markup,
         parse_mode=ParseMode.HTML
     )
