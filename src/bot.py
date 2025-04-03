@@ -184,9 +184,10 @@ async def pay_chapter_callback_handle(update: Update, context: CallbackContext) 
         return ConversationHandler.END
 
     order_code = other_func.generate_order_number()
-    pdb.create_order(user_id=user_id, course_chapter=course_mask, order_code=order_code)
+    order_id = pdb.create_order(user_id=user_id, course_chapter=course_mask, order_code=order_code)
     context.user_data['selected_course'] = course
     context.user_data['chapter_number'] = num_of_chapter
+    context.user_data['order_id'] = order_id
     context.user_data['order_code'] = order_code
     context.user_data['is_in_conversation'] = True
 
@@ -282,6 +283,7 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
         return ASK_EMAIL
 
     order_code = context.user_data['order_code']
+    order_id = context.user_data['order_id']
     pdb.update_order_email_and_agreements(order_code=order_code, email=email)
     context.user_data['email'] = email
     email_msg = context.user_data.get('email_msg')
@@ -309,6 +311,7 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
         user_id=user_id,
         email=email,
         num_of_chapter=num,
+        order_id=order_id,
         order_code=order_code
     )
 
@@ -356,12 +359,14 @@ async def upd_payment_url_handle(update: Update, context: CallbackContext) -> No
     user_id = order_data['user_id']
     email = order_data['email']
     num = order_data['course_chapter'].split('_')[1]
+    order_id = order_data['order_id']
 
     payment_url = await payment.create_payment(
         price=course['price'],
         user_id=user_id,
         email=email,
         num_of_chapter=num,
+        order_id=order_id,
         order_code=order_code
     )
 
