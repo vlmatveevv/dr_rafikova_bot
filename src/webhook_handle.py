@@ -37,6 +37,7 @@ async def yookassa_webhook(request: Request, background_tasks: BackgroundTasks):
 
     user_id = int(payment_object.get('metadata', {}).get('user_id'))
     chapter = payment_object.get('metadata', {}).get('chapter', '')
+    order_id = int(payment_object.get('metadata', {}).get('order_id', ''))
     course = config.courses.get(chapter)
 
     channel_invite_url = course['channel_invite_link']

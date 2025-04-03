@@ -308,12 +308,13 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
         price=course['price'],
         user_id=user_id,
         email=email,
-        num_of_chapter=num
+        num_of_chapter=num,
+        order_code=order_code
     )
 
     keyboard = [
         [InlineKeyboardButton("✅ Подтвердить и оплатить", url=payment_url)],
-        [InlineKeyboardButton("🔄 Обновить платежную ссылку", callback_data=f'upd_payment_url:{order_code}')],
+        # [InlineKeyboardButton("🔄 Обновить платежную ссылку", callback_data=f'upd_payment_url:{order_code}')],
         [InlineKeyboardButton("🚫 Отмена", callback_data='cancel')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -360,7 +361,8 @@ async def upd_payment_url_handle(update: Update, context: CallbackContext) -> No
         price=course['price'],
         user_id=user_id,
         email=email,
-        num_of_chapter=num
+        num_of_chapter=num,
+        order_code=order_code
     )
 
     keyboard = [
