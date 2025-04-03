@@ -212,9 +212,9 @@ async def all_courses_callback_handle(update: Update, context: CallbackContext) 
 async def documents_command(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
     offer_text = f'<a href="{config.other_cfg["links"]["offer"]}">Ознакомиться с офертой</a>'
-    privacy_text = f'<a href="{config.other_cfg["links"]["privacy"]}">Ознакомиться с политика обработки персональных данных</a>'
+    privacy_text = f'<a href="{config.other_cfg["links"]["privacy"]}">Ознакомиться с политикой обработки персональных данных</a>'
     consent_text = f'<a href="{config.other_cfg["links"]["consent"]}">Ознакомиться с документом на получение рекламной и информационной рассылки</a>'
-    chargeback_text = f'<a href="{config.other_cfg["links"]["consent"]}">Ознакомиться с заявление на возврат денежных средств</a>'
+    chargeback_text = f'<a href="{config.other_cfg["links"]["chargeback"]}">Ознакомиться с заявлением на возврат денежных средств</a>'
     text = offer_text + "\n\n" + privacy_text + "\n\n" + consent_text + "\n\n" + chargeback_text
 
     keyboard = [
