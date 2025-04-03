@@ -42,7 +42,7 @@ async def yookassa_webhook(request: Request, background_tasks: BackgroundTasks):
 
     channel_invite_url = course['channel_invite_link']
 
-    await pdb.add_payment(external_payment_id=payment_id, amount=amount, income_amount=income_amount,
+    pdb.add_payment(external_payment_id=payment_id, amount=amount, income_amount=income_amount,
                           payment_method_type=payment_method_type, order_id=order_id)
 
     keyboard = [
