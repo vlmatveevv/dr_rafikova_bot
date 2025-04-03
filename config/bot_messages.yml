@@ -1,4 +1,4 @@
-hello: "Добро пожаловать, {name}"
+hello: "Добро пожаловать, {first_name}"
 choose_chapter: "Выберите раздел"
 buy_chapter_info: |
   <b>Описание:</b>
