@@ -594,6 +594,7 @@ def run():
         .write_timeout(60)
         .concurrent_updates(True)
         .rate_limiter(rate_limiter)
+        .post_init(post_init)
         .build()
     )
 
