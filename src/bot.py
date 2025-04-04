@@ -446,7 +446,7 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
         price=course['price'],
     )
 
-    payment_url = await payment.create_payment_robokassa(
+    payment_url = payment.create_payment_robokassa(
         price=course['price'],
         email=email,
         num_of_chapter=num,
