@@ -399,13 +399,13 @@ async def handle_newsletter_agree(update: Update, context: CallbackContext) -> i
 
     order_code = query.data.split(':')[1]
 
-    pdb.update_order_email_and_agreements(order_code=order_code, agreed_newsletter=True)
     keyboard = [
         [InlineKeyboardButton("🚫 Отмена", callback_data='cancel')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     email_msg = await query.edit_message_text(text="📧 Введите ваш e-mail для отправки чека:",
                                               reply_markup=reply_markup)
+    pdb.update_order_email_and_agreements(order_code=order_code, agreed_newsletter=True)
     context.user_data['email_msg'] = email_msg
     context.user_data['order_code'] = order_code
     return ASK_EMAIL
