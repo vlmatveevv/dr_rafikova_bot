@@ -70,7 +70,7 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
     logger.info(request)
 
     form = await request.form()
-    logger.info(f"FORMMMM = {form})
+    logger.info(f"FORMMMM = {form}")
     # data = await request.json()
     # payment_object = data.get('object', {})
     # payment_id = payment_object.get('id')
