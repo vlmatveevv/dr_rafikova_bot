@@ -406,6 +406,7 @@ async def handle_newsletter_agree(update: Update, context: CallbackContext) -> i
     email_msg = await query.edit_message_text(text="📧 Введите ваш e-mail для отправки чека:",
                                               reply_markup=reply_markup)
     pdb.update_order_email_and_agreements(order_code=order_code, agreed_newsletter=True)
+
     context.user_data['email_msg'] = email_msg
     context.user_data['order_code'] = order_code
     return ASK_EMAIL
@@ -575,9 +576,9 @@ async def post_init(application: Application) -> None:
 buy_course_conversation = ConversationHandler(
     entry_points=[CallbackQueryHandler(pay_chapter_callback_handle, pattern="^pay_chapter:")],
     states={
-        AGREE_OFFER: [CallbackQueryHandler(handle_offer_agree, pattern="^agree_offer$")],
-        AGREE_PRIVACY: [CallbackQueryHandler(handle_privacy_agree, pattern="^agree_privacy$")],
-        AGREE_NEWSLETTER: [CallbackQueryHandler(handle_newsletter_agree, pattern="^agree_newsletter$")],
+        AGREE_OFFER: [CallbackQueryHandler(handle_offer_agree, pattern="^agree_offer:")],
+        AGREE_PRIVACY: [CallbackQueryHandler(handle_privacy_agree, pattern="^agree_privacy:")],
+        AGREE_NEWSLETTER: [CallbackQueryHandler(handle_newsletter_agree, pattern="^agree_newsletter:")],
         ASK_EMAIL: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_email_handle)],
     },
     fallbacks=[CallbackQueryHandler(cancel_payment_handle, pattern="^cancel$")],
