@@ -284,10 +284,9 @@ async def buy_chapter_callback_handle(update: Update, context: CallbackContext) 
         name=course['name']
     )
 
-    user_has_paid_course = pdb.has_paid_course(user_id, chapter_mask)
     keyboard = []
 
-    if user_has_paid_course:
+    if pdb.has_paid_course(user_id, chapter_mask) or pdb.has_manual_access(user_id, chapter_mask):
         keyboard.append([
             InlineKeyboardButton(config.bot_btn['go_to_channel'], url=course['channel_invite_link'])
         ])
