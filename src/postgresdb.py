@@ -116,21 +116,43 @@ class Database:
             print(f"Ошибка при получении платежа по order_id {order_id}: {e}")
             return None
 
-    def payment_exists(self, external_payment_id: str) -> bool:
+    # def payment_exists(self, external_payment_id: str) -> bool:
+    #     """
+    #     Проверка, существует ли платеж с данным payment_id в базе данных.
+    #     :param external_payment_id: Уникальный ID платежа
+    #     :return: True, если платеж существует, иначе False
+    #     """
+    #     try:
+    #         with self.conn.cursor() as cursor:
+    #             cursor.execute("""
+    #                 SELECT EXISTS(SELECT 1 FROM payments WHERE external_payment_id = %s)
+    #             """, (external_payment_id,))
+    #             return cursor.fetchone()[0]
+    #     except Exception as e:
+    #         self.conn.rollback()
+    #         print(f"Error checking payment existence: {e}")
+    #         return False
+
+    def payment_exists_by_order_code(self, order_code: int) -> bool:
         """
-        Проверка, существует ли платеж с данным payment_id в базе данных.
-        :param external_payment_id: Уникальный ID платежа
+        Проверка, существует ли платеж, связанный с данным order_code (InvId).
+        :param order_code: Код заказа (из Robokassa — InvId)
         :return: True, если платеж существует, иначе False
         """
         try:
             with self.conn.cursor() as cursor:
                 cursor.execute("""
-                    SELECT EXISTS(SELECT 1 FROM payments WHERE external_payment_id = %s)
-                """, (external_payment_id,))
+                    SELECT EXISTS(
+                        SELECT 1
+                        FROM payments p
+                        JOIN orders o ON p.order_id = o.order_id
+                        WHERE o.order_code = %s
+                    )
+                """, (order_code,))
                 return cursor.fetchone()[0]
         except Exception as e:
             self.conn.rollback()
-            print(f"Error checking payment existence: {e}")
+            print(f"Error checking payment by order_code: {e}")
             return False
 
     def get_paid_courses_by_user(self, user_id: int) -> list:

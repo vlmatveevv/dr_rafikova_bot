@@ -58,7 +58,7 @@ async def create_payment(price, user_id, email, num_of_chapter, order_id, order_
     return payment.confirmation.confirmation_url
 
 
-def create_payment_robokassa(price, email, num_of_chapter, order_code):
+def create_payment_robokassa(price, email, num_of_chapter, order_code, order_id, user_id):
     formatted_chapter = f'ch_{num_of_chapter}'
     course = config.courses.get(formatted_chapter)
     name = course['name']
@@ -70,7 +70,10 @@ def create_payment_robokassa(price, email, num_of_chapter, order_code):
         invoice_type=InvoiceType.ONE_TIME,
         email=email,
         inv_id=order_code,
-        out_sum=price
+        out_sum=price,
+        user_id=user_id,           # 👈 кастомное поле
+        chapter=num_of_chapter,    # 👈 ещё одно кастомное поле
+        order_id=order_id          # 👈 и ещё
     )
 
     return response.url  # ✅ ВАЖНО: возвращаем строку, а не объект
