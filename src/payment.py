@@ -63,7 +63,11 @@ async def create_payment_robokassa(price, email, num_of_chapter, order_code):
     course = config.courses.get(formatted_chapter)
     name = course['name']
     description = f"Доступ к разделу курса {name}. Заказ #n{order_code}"
-    payment_url = await robokassa.generate_protected_payment_link(
+    # payment_url = await robokassa.generate_protected_payment_link(
+    #     merchant_comments="no comment", description=description, invoice_type=InvoiceType.ONE_TIME, email=email,
+    #     inv_id=order_code, out_sum=price
+    # )
+    payment_url = await robokassa.generate_open_payment_link(
         merchant_comments="no comment", description=description, invoice_type=InvoiceType.ONE_TIME, email=email,
         inv_id=order_code, out_sum=price
     )
