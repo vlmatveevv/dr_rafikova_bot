@@ -328,11 +328,11 @@ async def pay_chapter_callback_handle(update: Update, context: CallbackContext) 
     context.user_data['selected_course'] = course
     context.user_data['chapter_number'] = num_of_chapter
     context.user_data['order_id'] = order_id
-    context.user_data['order_code'] = order_code
+
     context.user_data['is_in_conversation'] = True
 
     keyboard = [
-        [InlineKeyboardButton("✅ Принимаю", callback_data="agree_offer")],
+        [InlineKeyboardButton("✅ Принимаю", callback_data=f"agree_offer:{order_code}")],
         [InlineKeyboardButton("🚫 Отмена", callback_data='cancel')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -352,10 +352,10 @@ async def handle_offer_agree(update: Update, context: CallbackContext) -> int:
     query = update.callback_query
     await query.answer()
 
-    order_code = context.user_data['order_code']
+    order_code = query.data.split(':')[1]
     pdb.update_order_email_and_agreements(order_code=order_code, agreed_offer=True)
 
-    keyboard = [[InlineKeyboardButton("✅ Даю согласие", callback_data="agree_privacy")],
+    keyboard = [[InlineKeyboardButton("✅ Даю согласие", callback_data=f"agree_privacy:{order_code}")],
                 [InlineKeyboardButton("🚫 Отмена", callback_data='cancel')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -373,10 +373,11 @@ async def handle_offer_agree(update: Update, context: CallbackContext) -> int:
 async def handle_privacy_agree(update: Update, context: CallbackContext) -> int:
     query = update.callback_query
     await query.answer()
-    order_code = context.user_data['order_code']
+    order_code = query.data.split(':')[1]
+
     pdb.update_order_email_and_agreements(order_code=order_code, agreed_privacy=True)
     keyboard = [
-        [InlineKeyboardButton("✅ Я согласен", callback_data="agree_newsletter")],
+        [InlineKeyboardButton("✅ Я согласен", callback_data=f"agree_newsletter:{order_code}")],
         [InlineKeyboardButton("🚫 Отмена", callback_data='cancel')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -396,7 +397,8 @@ async def handle_newsletter_agree(update: Update, context: CallbackContext) -> i
     query = update.callback_query
     await query.answer()
 
-    order_code = context.user_data['order_code']
+    order_code = query.data.split(':')[1]
+
     pdb.update_order_email_and_agreements(order_code=order_code, agreed_newsletter=True)
     keyboard = [
         [InlineKeyboardButton("🚫 Отмена", callback_data='cancel')]
@@ -405,6 +407,7 @@ async def handle_newsletter_agree(update: Update, context: CallbackContext) -> i
     email_msg = await query.edit_message_text(text="📧 Введите ваш e-mail для отправки чека:",
                                               reply_markup=reply_markup)
     context.user_data['email_msg'] = email_msg
+    context.user_data['order_code'] = order_code
     return ASK_EMAIL
 
 
