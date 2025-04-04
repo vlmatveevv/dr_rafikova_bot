@@ -64,28 +64,26 @@ class Database:
             self.conn.rollback()  # Откат транзакции в случае ошибки
             return False
 
-    def add_payment(self, external_payment_id: str, amount: float, income_amount: float,
+    def add_payment(self, amount: float, income_amount: float,
                     payment_method_type: str, order_id: int) -> bool:
         """
-        Добавляет новый платеж в таблицу payments.
+        Добавляет новый платёж в таблицу payments.
 
-        :param external_payment_id: Уникальный ID платежа от платёжной системы.
         :param amount: Сумма платежа.
         :param income_amount: Сумма после вычета комиссии.
-        :param payment_method_type: Тип платежного метода (например, 'card', 'sbp').
-        :param order_id: ID заказа.
-        :return: True, если платеж успешно добавлен, иначе False.
+        :param payment_method_type: Тип платёжного метода (например, 'card', 'sbp').
+        :param order_id: ID заказа (внутренний).
+        :return: True, если платёж успешно добавлен, иначе False.
         """
         try:
             with self.conn.cursor() as cursor:
                 query = """
                     INSERT INTO payments (
-                        external_payment_id, amount, income_amount, 
+                        amount, income_amount, 
                         payment_method_type, order_id, created_at
-                    ) VALUES (%s, %s, %s, %s, %s, NOW())
+                    ) VALUES (%s, %s, %s, %s, NOW())
                 """
                 params = (
-                    external_payment_id,
                     amount,
                     income_amount,
                     payment_method_type,
