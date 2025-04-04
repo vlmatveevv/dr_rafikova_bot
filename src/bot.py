@@ -450,7 +450,6 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
         price=course['price'],
         email=email,
         num_of_chapter=num,
-        order_id=order_id,
         order_code=order_code
     )
 
