@@ -72,7 +72,7 @@ def create_payment_robokassa(price, email, num_of_chapter, order_code, order_id,
         inv_id=order_code,
         out_sum=price,
         user_id=user_id,           # 👈 кастомное поле
-        chapter=num_of_chapter,    # 👈 ещё одно кастомное поле
+        formatted_chapter=formatted_chapter,    # 👈 ещё одно кастомное поле
         order_id=order_id          # 👈 и ещё
     )
 

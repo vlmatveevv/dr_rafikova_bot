@@ -81,7 +81,7 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
         # Извлекаем данные из shp_
         user_id = int(data.get("shp_user_id"))
         order_id = int(data.get("shp_order_id"))
-        chapter = data.get("shp_chapter")
+        formatted_chapter = data.get("shp_formatted_chapter")
 
         # Проверка по order_code (inv_id)
         if pdb.payment_exists_by_order_code(inv_id):
@@ -89,9 +89,9 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
             return "OK"
 
         # Проверка курса
-        course = config.courses.get(chapter)
+        course = config.courses.get(formatted_chapter)
         if not course:
-            logger.error(f"❌ Курс по ключу '{chapter}' не найден.")
+            logger.error(f"❌ Курс по ключу '{formatted_chapter}' не найден.")
             return "OK"
 
         channel_name = course["name"]
