@@ -67,7 +67,7 @@ async def create_payment_robokassa(price, email, num_of_chapter, order_code):
     #     merchant_comments="no comment", description=description, invoice_type=InvoiceType.ONE_TIME, email=email,
     #     inv_id=order_code, out_sum=price
     # )
-    payment_url = await robokassa.generate_open_payment_link(
+    payment_url = robokassa.generate_open_payment_link(
         merchant_comments="no comment", description=description, invoice_type=InvoiceType.ONE_TIME, email=email,
         inv_id=order_code, out_sum=price
     )
