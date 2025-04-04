@@ -375,7 +375,7 @@ async def handle_privacy_agree(update: Update, context: CallbackContext) -> int:
     await query.answer()
     order_code = query.data.split(':')[1]
 
-    # pdb.update_order_email_and_agreements(order_code=order_code, agreed_privacy=True)
+    pdb.update_order_email_and_agreements(order_code=order_code, agreed_privacy=True)
     keyboard = [
         [InlineKeyboardButton("✅ Я согласен", callback_data=f"agree_newsletter:{order_code}")],
         [InlineKeyboardButton("🚫 Отмена", callback_data='cancel')]
@@ -405,7 +405,7 @@ async def handle_newsletter_agree(update: Update, context: CallbackContext) -> i
     reply_markup = InlineKeyboardMarkup(keyboard)
     email_msg = await query.edit_message_text(text="📧 Введите ваш e-mail для отправки чека:",
                                               reply_markup=reply_markup)
-    # pdb.update_order_email_and_agreements(order_code=order_code, agreed_newsletter=True)
+    pdb.update_order_email_and_agreements(order_code=order_code, agreed_newsletter=True)
 
     context.user_data['email_msg'] = email_msg
     context.user_data['order_code'] = order_code
@@ -428,7 +428,7 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
 
     order_code = context.user_data['order_code']
     order_id = context.user_data['order_id']
-    # pdb.update_order_email_and_agreements(order_code=order_code, email=email)
+    pdb.update_order_email_and_agreements(order_code=order_code, email=email)
     context.user_data['email'] = email
     email_msg = context.user_data.get('email_msg')
     user_id = update.effective_user.id
