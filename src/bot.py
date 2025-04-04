@@ -396,7 +396,6 @@ async def handle_privacy_agree(update: Update, context: CallbackContext) -> int:
 async def handle_newsletter_agree(update: Update, context: CallbackContext) -> int:
     query = update.callback_query
     await query.answer()
-
     order_code = query.data.split(':')[1]
 
     keyboard = [
@@ -546,7 +545,7 @@ async def handle_join_request(update: Update, context: CallbackContext):
     course_key = config.channel_id_to_key.get(chat_id)
     logger.info(f"course_key! = {course_key}")
 
-    if pdb.has_paid_course(user_id=user_id, course_chapter=course_key):
+    if pdb.has_manual_access(user_id, course_key) or pdb.has_paid_course(user_id, course_key):
         await join_request.approve()
         keyboard = [
             [InlineKeyboardButton("✅ Перейти в канал", url=channel_invite_link)],
@@ -560,7 +559,41 @@ async def handle_join_request(update: Update, context: CallbackContext):
         logger.info(f"✅ Одобрен вход для {allowed_users[user_id]} ({user_id})")
     else:
         await join_request.decline()
-        logger.info(f"❌ Отклонён вход для неизвестного пользователя {user_id}")
+        keyboard = [
+            [InlineKeyboardButton("✅ Выдать доступ", callback_data=f"grant_access:{user_id}:{course_key}")],
+            [InlineKeyboardButton("❌ Не выдавать доступ", callback_data=f"deny_access:{user_id}:{course_key}")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await context.bot.send_message(
+            chat_id=config.cfg['ADMIN_CHAT_ID']['MAIN'],
+            text=f"❌ Пользователь {user_id} был отклонён при попытке вступить в {name}. Хотите выдать ему доступ?",
+            reply_markup=reply_markup,
+            message_thread_id=config.cfg['ADMIN_CHAT_ID']['DECLINED_REQUESTS']
+        )
+
+
+async def grant_manual_access_handle(update: Update, context: CallbackContext):
+    query = update.callback_query
+    await query.answer()
+
+    _, user_id_str, course_key = query.data.split(":")
+    user_id = int(user_id_str)
+    admin_id = query.from_user.id
+
+    # Добавим доступ в manual_access
+    try:
+        pdb.grant_manual_access(user_id=user_id, course_chapter=course_key, granted_by=admin_id)
+        await query.edit_message_text(f"✅ Доступ пользователю {user_id} к курсу {course_key} успешно выдан. Теперь ему нужно заново перейти в канал.")
+    except Exception as e:
+        logger.error(f"❌ Ошибка выдачи доступа: {e}")
+        await query.edit_message_text("❌ Ошибка при попытке выдать доступ.")
+
+
+async def deny_manual_access(update: Update, context: CallbackContext):
+    query = update.callback_query
+    await query.answer()
+    _, user_id_str, course_key = query.data.split(":")
+    await query.edit_message_text(f"⛔️ Вы отказали в доступе пользователю {user_id_str} к курсу {course_key}.")
 
 
 async def post_init(application: Application) -> None:
@@ -619,6 +652,9 @@ def run():
     application.add_handler(CallbackQueryHandler(my_courses_callback_handle, pattern="^my_courses$"))
     application.add_handler(CallbackQueryHandler(all_courses_callback_handle, pattern="^all_courses$"))
     application.add_handler(CallbackQueryHandler(documents_callback_handle, pattern="^documents$"))
+
+    application.add_handler(CallbackQueryHandler(grant_manual_access_handle, pattern="^grant_access:"))
+    application.add_handler(CallbackQueryHandler(deny_manual_access, pattern="^deny_access:"))
 
     application.add_handler(buy_course_conversation)
     application.add_handler(ChatJoinRequestHandler(handle_join_request))

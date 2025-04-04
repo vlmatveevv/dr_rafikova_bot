@@ -313,3 +313,38 @@ class Database:
             self.conn.rollback()
             print(f"Error getting order: {e}")
             return None
+
+    def grant_manual_access(self, user_id: int, course_chapter: str, granted_by: int):
+        try:
+            with self.conn.cursor() as cursor:
+                cursor.execute("""
+                    INSERT INTO manual_access (user_id, course_chapter, granted_by)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (user_id, course_chapter) DO NOTHING
+                """, (user_id, course_chapter, granted_by))
+                self.conn.commit()
+        except Exception as e:
+            print(f"❌ Ошибка при добавлении доступа в manual_access: {e}")
+            self.conn.rollback()
+            raise
+
+    def has_manual_access(self, user_id: int, course_chapter: str) -> bool:
+        """
+        Проверяет, был ли пользователю вручную выдан доступ к курсу.
+
+        :param user_id: Telegram ID пользователя.
+        :param course_chapter: Название курса (например, 'ch_1').
+        :return: True, если доступ есть, иначе False.
+        """
+        try:
+            with self.conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT EXISTS (
+                        SELECT 1 FROM manual_access
+                        WHERE user_id = %s AND course_chapter = %s
+                    )
+                """, (user_id, course_chapter))
+                return cursor.fetchone()[0]
+        except Exception as e:
+            print(f"❌ Ошибка при проверке ручного доступа: {e}")
+            return False
