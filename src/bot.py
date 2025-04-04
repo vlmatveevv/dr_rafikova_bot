@@ -143,11 +143,11 @@ async def register(update: Update, context: CallbackContext) -> int:
 async def my_courses_command(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
 
-    # Получаем список оплаченных курсов
-    paid_courses = pdb.get_paid_courses_by_user(user_id)
+    # Получаем все доступные курсы
+    available_courses = pdb.get_all_user_courses(user_id)
 
-    if not paid_courses:
-        text = "У вас пока нет оплаченных курсов."
+    if not available_courses:
+        text = "У вас пока нет доступных курсов."
         keyboard = [
             [InlineKeyboardButton("📲 Главное меню", callback_data="main_menu")]
         ]
@@ -157,7 +157,7 @@ async def my_courses_command(update: Update, context: CallbackContext) -> None:
 
     keyboard = []
 
-    for course_key in paid_courses:
+    for course_key in available_courses:
         course = config.courses.get(course_key)
         if course:
             button = InlineKeyboardButton(
@@ -172,7 +172,7 @@ async def my_courses_command(update: Update, context: CallbackContext) -> None:
     )])
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    text = "Ваши оплаченные курсы. Нажмите, чтобы перейти:"
+    text = "Ваши доступные курсы. Нажмите, чтобы перейти:"
     await send_or_edit_message(update, context, text, reply_markup)
 
 
@@ -579,11 +579,12 @@ async def grant_manual_access_handle(update: Update, context: CallbackContext):
     _, user_id_str, course_key = query.data.split(":")
     user_id = int(user_id_str)
     admin_id = query.from_user.id
-
+    course = config.courses.get(course_key)
+    name = course['name']
     # Добавим доступ в manual_access
     try:
         pdb.grant_manual_access(user_id=user_id, course_chapter=course_key, granted_by=admin_id)
-        await query.edit_message_text(f"✅ Доступ пользователю {user_id} к курсу {course_key} успешно выдан. Теперь ему нужно заново перейти в канал.")
+        await query.edit_message_text(f"✅ Доступ пользователю {user_id} к курсу {name} успешно выдан. Теперь ему нужно заново перейти в канал.")
     except Exception as e:
         logger.error(f"❌ Ошибка выдачи доступа: {e}")
         await query.edit_message_text("❌ Ошибка при попытке выдать доступ.")
