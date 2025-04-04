@@ -221,50 +221,59 @@ class Database:
             self.conn.rollback()
             raise
 
-    def update_order_email_and_agreements(self,
-                                          order_code: int,
-                                          email: str = None,
-                                          agreed_offer: bool = None,
-                                          agreed_privacy: bool = None,
-                                          agreed_newsletter: bool = None) -> None:
-        """
-        Обновляет email и/или флаги согласий у заказа по order_code.
-        Только те поля, которые переданы (не None).
-        """
+    def update_email(self, order_code: int, email: str):
         try:
             with self.conn.cursor() as cursor:
-                fields = []
-                values = []
-
-                if email is not None:
-                    fields.append("email = %s")
-                    values.append(email)
-                if agreed_offer is not None:
-                    fields.append("agreed_offer = %s")
-                    values.append(agreed_offer)
-                if agreed_privacy is not None:
-                    fields.append("agreed_privacy = %s")
-                    values.append(agreed_privacy)
-                if agreed_newsletter is not None:
-                    fields.append("agreed_newsletter = %s")
-                    values.append(agreed_newsletter)
-
-                if not fields:
-                    # Нечего обновлять — просто выходим
-                    return
-
-                query = f"""
+                cursor.execute("""
                     UPDATE orders
-                    SET {', '.join(fields)},
-                        updated_at = CURRENT_TIMESTAMP
+                    SET email = %s, updated_at = CURRENT_TIMESTAMP
                     WHERE order_code = %s
-                """
-                values.append(order_code)
-
-                cursor.execute(query, tuple(values))
+                """, (email, order_code))
                 self.conn.commit()
         except Exception as e:
-            print(f"❌ Ошибка при обновлении заказа: {e}")
+            print(f"❌ Ошибка при обновлении email: {e}")
+            self.conn.rollback()
+            raise
+
+    def update_agreed_offer(self, order_code: int, value: bool):
+        try:
+            with self.conn.cursor() as cursor:
+                cursor.execute("""
+                    UPDATE orders
+                    SET agreed_offer = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE order_code = %s
+                """, (value, order_code))
+                self.conn.commit()
+        except Exception as e:
+            print(f"❌ Ошибка при обновлении agreed_offer: {e}")
+            self.conn.rollback()
+            raise
+
+    def update_agreed_privacy(self, order_code: int, value: bool):
+        try:
+            with self.conn.cursor() as cursor:
+                cursor.execute("""
+                    UPDATE orders
+                    SET agreed_privacy = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE order_code = %s
+                """, (value, order_code))
+                self.conn.commit()
+        except Exception as e:
+            print(f"❌ Ошибка при обновлении agreed_privacy: {e}")
+            self.conn.rollback()
+            raise
+
+    def update_agreed_newsletter(self, order_code: int, value: bool):
+        try:
+            with self.conn.cursor() as cursor:
+                cursor.execute("""
+                    UPDATE orders
+                    SET agreed_newsletter = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE order_code = %s
+                """, (value, order_code))
+                self.conn.commit()
+        except Exception as e:
+            print(f"❌ Ошибка при обновлении agreed_newsletter: {e}")
             self.conn.rollback()
             raise
 
