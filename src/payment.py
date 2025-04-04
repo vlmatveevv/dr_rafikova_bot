@@ -4,7 +4,7 @@ from robokassa import HashAlgorithm, Robokassa
 from robokassa.types import InvoiceType
 
 robokassa = Robokassa(
-    merchant_login="my_login",
+    merchant_login=config.config_env['MERCHANT_LOGIN_ROBOKASSA'],
     password1=config.config_env['ROBOKASSA_PASS_1_TEST'],
     password2=config.config_env['ROBOKASSA_PASS_2_TEST'],
     is_test=True,
