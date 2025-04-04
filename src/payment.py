@@ -58,17 +58,19 @@ async def create_payment(price, user_id, email, num_of_chapter, order_id, order_
     return payment.confirmation.confirmation_url
 
 
-async def create_payment_robokassa(price, email, num_of_chapter, order_code):
+def create_payment_robokassa(price, email, num_of_chapter, order_code):
     formatted_chapter = f'ch_{num_of_chapter}'
     course = config.courses.get(formatted_chapter)
     name = course['name']
     description = f"Доступ к разделу курса {name}. Заказ #n{order_code}"
-    # payment_url = await robokassa.generate_protected_payment_link(
-    #     merchant_comments="no comment", description=description, invoice_type=InvoiceType.ONE_TIME, email=email,
-    #     inv_id=order_code, out_sum=price
-    # )
-    payment_url = robokassa.generate_open_payment_link(
-        merchant_comments="no comment", description=description, invoice_type=InvoiceType.ONE_TIME, email=email,
-        inv_id=order_code, out_sum=price
+
+    response = robokassa.generate_open_payment_link(
+        merchant_comments="no comment",
+        description=description,
+        invoice_type=InvoiceType.ONE_TIME,
+        email=email,
+        inv_id=order_code,
+        out_sum=price
     )
-    return payment_url
+
+    return response.url  # ✅ ВАЖНО: возвращаем строку, а не объект

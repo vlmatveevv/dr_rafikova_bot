@@ -452,7 +452,6 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
         num_of_chapter=num,
         order_code=order_code
     )
-    logger.info(payment_url)
 
     keyboard = [
         [InlineKeyboardButton("✅ Подтвердить и оплатить", url=payment_url)],
