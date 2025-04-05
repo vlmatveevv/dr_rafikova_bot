@@ -11,3 +11,4 @@ aiohttp>=3.8.0
 psycopg2==2.9.5
 robokassa==1.0.1
 python-multipart
+Jinja2

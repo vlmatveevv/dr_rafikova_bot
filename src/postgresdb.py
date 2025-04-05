@@ -64,6 +64,23 @@ class Database:
             self.conn.rollback()  # Откат транзакции в случае ошибки
             return False
 
+    def get_user_by_user_id(self, user_id: int):
+        """
+        Получение информации о пользователе по user_id.
+        :param user_id: Telegram ID пользователя
+        :return: Информация о платеже или None
+        """
+        try:
+            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute("""
+                    SELECT * FROM payments WHERE user_id = %s
+                """, (user_id,))
+                return cursor.fetchone()
+        except Exception as e:
+            self.conn.rollback()
+            print(f"Error getting payment: {e}")
+            return None
+
     def add_payment(self, amount: float, income_amount: float,
                     payment_method_type: str, order_id: int) -> bool:
         """

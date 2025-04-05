@@ -10,6 +10,7 @@ from fastapi import Request
 from setup import pdb, moscow_tz
 from datetime import datetime
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from jinja2 import Template
 
 # Настройка логгера
 logging.basicConfig(level=logging.INFO)
@@ -77,6 +78,7 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
         out_sum = float(data.get("OutSum", 0))
         payment_method_type = data.get("PaymentMethod", "unknown")
         fee = float(data.get("Fee", 0.0))
+        income_amount = out_sum - fee
 
         # Извлекаем данные из shp_
         user_id = int(data.get("shp_user_id"))
@@ -100,7 +102,7 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
         # Сохраняем платёж
         pdb.add_payment(
             amount=out_sum,
-            income_amount=out_sum - fee,
+            income_amount=income_amount,
             payment_method_type=payment_method_type,
             order_id=order_id
         )
@@ -114,6 +116,35 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
             user_id=user_id,
             text=f"🎉 Вы успешно оплатили курс <b>{channel_name}</b>!\nНажмите кнопку ниже, чтобы вступить в канал:",
             reply_markup=reply_markup
+        )
+
+        user_info = pdb.get_user_by_user_id(user_id)
+
+
+        user_data = {
+            "user_id": user_info.get("user_id"),
+            "full_name": f"{user_info.get('first_name', '')} {user_info.get('last_name', '')}".strip(),
+            "username": user_info.get("username"),
+        }
+
+        user_template_str = config.admin_msg['user_info_block']
+        user_info_block = Template(user_template_str).render(**user_data)
+
+        admin_payment_notification_text = config.admin_msg['admin_payment_notification'].format(
+            user_info_block=user_info_block,
+            channel_name=channel_name,
+            out_sum=out_sum,
+            payment_method_type=payment_method_type,
+            income_amount=income_amount,
+            user_id=user_id,
+            order_code=inv_id,
+            formatted_chapter=formatted_chapter
+        )
+        background_tasks.add_task(
+            telegram_https.send_message,
+            user_id=config.cfg['ADMIN_CHAT_ID']['MAIN'],
+            text=admin_payment_notification_text,
+            message_thread_id=config.cfg['ADMIN_CHAT_ID']['PAYMENTS']
         )
 
         logger.info(f"✅ Платёж InvId={inv_id} от user_id={user_id} успешно обработан.")
