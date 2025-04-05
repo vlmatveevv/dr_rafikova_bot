@@ -1,17 +1,18 @@
-  admin_payment_notification: |
-    💸 <b>Новая оплата</b>
+admin_payment_notification: |
+  💸 <b>Новая оплата</b>
 
-    👤 <b>Пользователь:
-    <blockquote>{user_info_block}</blockquote>
-    📦 <b>Канал:</b> {channel_name}
-    💰 <b>Сумма:</b> {out_sum}₽
-    💳 <b>Метод оплаты:</b> {payment_method_type}
-    💸 <b>Чистый доход:</b> {income_amount}₽
+  {user_info_block}
 
-    #id{user_id} #n{order_code} #{formatted_chapter}
+  📦 <b>Канал:</b> {channel_name}
+  💰 <b>Сумма:</b> {out_sum}₽
+  💳 <b>Метод оплаты:</b> {payment_method_type}
+  💸 <b>Чистый доход:</b> {income_amount}₽
+
+  #id{user_id} #n{order_code} #{formatted_chapter}
 
 user_info_block: |
   <b>👤 Пользователь:</b>
+  <blockquote>
   🆔 ID: <code>{user_id}</code>
   {% if full_name %}
   🤗 Имя: {full_name}
@@ -19,3 +20,4 @@ user_info_block: |
   {% if username %}
   🔗 Username: @{username}
   {% endif %}
+  </blockquote>
