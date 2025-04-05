@@ -120,17 +120,19 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
 
         user_info = pdb.get_user_by_user_id(user_id)
 
-
         user_data = {
             "user_id": user_info.get("user_id"),
             "full_name": f"{user_info.get('first_name', '')} {user_info.get('last_name', '')}".strip(),
             "username": user_info.get("username"),
         }
 
+        # Рендерим блок про пользователя
         user_template_str = config.admin_msg['user_info_block']
         user_info_block = Template(user_template_str).render(**user_data)
 
-        admin_payment_notification_text = config.admin_msg['admin_payment_notification'].format(
+        # Рендерим полное сообщение через Jinja2
+        admin_template_str = config.admin_msg['admin_payment_notification']
+        admin_payment_notification_text = Template(admin_template_str).render(
             user_info_block=user_info_block,
             channel_name=channel_name,
             out_sum=out_sum,
@@ -140,6 +142,8 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
             order_code=inv_id,
             formatted_chapter=formatted_chapter
         )
+
+        # Отправка сообщения админу
         background_tasks.add_task(
             telegram_https.send_message,
             user_id=config.cfg['ADMIN_CHAT_ID']['MAIN'],
