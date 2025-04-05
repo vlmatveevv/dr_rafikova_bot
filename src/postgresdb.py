@@ -73,7 +73,7 @@ class Database:
         try:
             with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
                 cursor.execute("""
-                    SELECT * FROM payments WHERE user_id = %s
+                    SELECT * FROM users WHERE user_id = %s
                 """, (user_id,))
                 return cursor.fetchone()
         except Exception as e:
