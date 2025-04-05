@@ -2,7 +2,7 @@
     💸 <b>Новая оплата</b>
 
     👤 <b>Пользователь:
-      <blockquote>{user_info_block}</blockquote>
+    <blockquote>{user_info_block}</blockquote>
     📦 <b>Канал:</b> {channel_name}
     💰 <b>Сумма:</b> {out_sum}₽
     💳 <b>Метод оплаты:</b> {payment_method_type}
@@ -12,7 +12,6 @@
 
 user_info_block: |
   <b>👤 Пользователь:</b>
-  <blockquote>
   🆔 ID: <code>{user_id}</code>
   {% if full_name %}
   🤗 Имя: {full_name}
@@ -20,4 +19,3 @@ user_info_block: |
   {% if username %}
   🔗 Username: @{username}
   {% endif %}
-  </blockquote>
