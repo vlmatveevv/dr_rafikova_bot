@@ -148,10 +148,8 @@ async def my_courses_command(update: Update, context: CallbackContext) -> None:
 
     if not available_courses:
         text = "У вас пока нет доступных курсов."
-        keyboard = [
-            [InlineKeyboardButton("📲 Главное меню", callback_data="main_menu")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        reply_markup = InlineKeyboardMarkup(my_keyboard.main_menu_button_markup())
         await send_or_edit_message(update, context, text, reply_markup)
         return
 
@@ -166,10 +164,7 @@ async def my_courses_command(update: Update, context: CallbackContext) -> None:
             )
             keyboard.append([button])  # каждая кнопка в новой строке
 
-    keyboard.append([InlineKeyboardButton(
-        text="📲 Главное меню",
-        callback_data='main_menu'
-    )])
+    keyboard.append(my_keyboard.main_menu_button_markup())
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     text = "Ваши доступные курсы. Нажмите, чтобы перейти:"
@@ -194,10 +189,7 @@ async def all_courses_command(update: Update, context: CallbackContext) -> None:
         )
         keyboard.append([button])
 
-    keyboard.append([InlineKeyboardButton(
-            text="📲 Главное меню",
-            callback_data='main_menu'
-        )])
+    keyboard.append(my_keyboard.main_menu_button_markup())
     reply_markup = InlineKeyboardMarkup(keyboard)
     text = config.bot_msg['choose_chapter']
     await send_or_edit_message(update, context, text, reply_markup)
@@ -231,12 +223,24 @@ async def documents_callback_handle(update: Update, context: CallbackContext) ->
     await documents_command(update, context)
 
 
+async def support_command(update: Update, context: CallbackContext) -> None:
+    text = config.bot_msg['support']
+    reply_markup = my_keyboard.main_menu_button_markup()
+    await send_or_edit_message(update, context, text, reply_markup)
+
+
+async def support_callback_handle(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    await query.answer()
+    await support_command(update, context)
+
+
 async def main_menu_callback_handle(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
     await query.answer()
     await query.edit_message_text(
         text="📲 Главное меню",
-        reply_markup=my_keyboard.main_menu_button_markup(),
+        reply_markup=my_keyboard.main_menu_items_button_markup(),
         parse_mode=ParseMode.HTML
     )
 
@@ -645,6 +649,7 @@ def run():
     application.add_handler(CommandHandler('my_courses', my_courses_command))
     application.add_handler(CommandHandler('all_courses', all_courses_command))
     application.add_handler(CommandHandler('documents', documents_command))
+    application.add_handler(CommandHandler('support', support_command))
 
     application.add_handler(CallbackQueryHandler(buy_courses_callback_handle, pattern="^buy_courses$"))
     application.add_handler(CallbackQueryHandler(buy_chapter_callback_handle, pattern="^buy_chapter:"))
@@ -654,6 +659,7 @@ def run():
     application.add_handler(CallbackQueryHandler(my_courses_callback_handle, pattern="^my_courses$"))
     application.add_handler(CallbackQueryHandler(all_courses_callback_handle, pattern="^all_courses$"))
     application.add_handler(CallbackQueryHandler(documents_callback_handle, pattern="^documents$"))
+    application.add_handler(CallbackQueryHandler(support_callback_handle(), pattern="^support$"))
 
     application.add_handler(CallbackQueryHandler(grant_manual_access_handle, pattern="^grant_access:"))
     application.add_handler(CallbackQueryHandler(deny_manual_access, pattern="^deny_access:"))
