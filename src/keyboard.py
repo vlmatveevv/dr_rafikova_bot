@@ -3,10 +3,10 @@ import config
 
 
 def main_menu_button_markup():
-    keyboard = [InlineKeyboardButton(
+    keyboard = [[InlineKeyboardButton(
         text="📲 Главное меню",
         callback_data='main_menu'
-    )]
+    )]]
     return keyboard
 
 
