@@ -659,7 +659,7 @@ def run():
     application.add_handler(CallbackQueryHandler(my_courses_callback_handle, pattern="^my_courses$"))
     application.add_handler(CallbackQueryHandler(all_courses_callback_handle, pattern="^all_courses$"))
     application.add_handler(CallbackQueryHandler(documents_callback_handle, pattern="^documents$"))
-    application.add_handler(CallbackQueryHandler(support_callback_handle(), pattern="^support$"))
+    application.add_handler(CallbackQueryHandler(support_callback_handle, pattern="^support$"))
 
     application.add_handler(CallbackQueryHandler(grant_manual_access_handle, pattern="^grant_access:"))
     application.add_handler(CallbackQueryHandler(deny_manual_access, pattern="^deny_access:"))
