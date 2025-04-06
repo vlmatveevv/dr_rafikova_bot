@@ -225,7 +225,7 @@ async def documents_callback_handle(update: Update, context: CallbackContext) ->
 
 async def support_command(update: Update, context: CallbackContext) -> None:
     text = config.bot_msg['support']
-    reply_markup = my_keyboard.main_menu_button_markup()
+    reply_markup = InlineKeyboardMarkup(my_keyboard.main_menu_button_markup())
     await send_or_edit_message(update, context, text, reply_markup)
 
 
