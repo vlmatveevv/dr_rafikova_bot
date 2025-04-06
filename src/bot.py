@@ -164,7 +164,7 @@ async def my_courses_command(update: Update, context: CallbackContext) -> None:
             )
             keyboard.append([button])  # каждая кнопка в новой строке
 
-    keyboard.append(my_keyboard.main_menu_button_markup())
+    keyboard.extend(my_keyboard.main_menu_button_markup())  # <-- исправлено
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     text = "Ваши доступные курсы. Нажмите, чтобы перейти:"
@@ -189,7 +189,7 @@ async def all_courses_command(update: Update, context: CallbackContext) -> None:
         )
         keyboard.append([button])
 
-    keyboard.append(my_keyboard.main_menu_button_markup())
+    keyboard.extend(my_keyboard.main_menu_button_markup())  # <-- исправлено
     reply_markup = InlineKeyboardMarkup(keyboard)
     text = config.bot_msg['choose_chapter']
     await send_or_edit_message(update, context, text, reply_markup)
