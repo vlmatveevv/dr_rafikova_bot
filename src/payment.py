@@ -8,7 +8,7 @@ robokassa = Robokassa(
     password1=config.config_env['ROBOKASSA_PASS_1'],
     password2=config.config_env['ROBOKASSA_PASS_2'],
     is_test=False,
-    algorithm=HashAlgorithm.md5,
+    algorithm=HashAlgorithm.sha256,
 )
 
 Configuration.account_id = config.config_env['SHOP_ID']
