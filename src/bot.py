@@ -209,7 +209,7 @@ async def documents_command(update: Update, context: CallbackContext) -> None:
     chargeback_text = f'<a href="{config.other_cfg["links"]["chargeback"]}">Ознакомиться с заявлением на возврат денежных средств</a>'
     text = person_info_text + "\n\n" + offer_text + "\n\n" + privacy_text + "\n\n" + consent_text + "\n\n" + chargeback_text
 
-    keboard = [
+    keyboard = [
         [InlineKeyboardButton("📲 Главное меню", callback_data="main_menu")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
