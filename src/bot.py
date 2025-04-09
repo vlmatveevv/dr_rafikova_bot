@@ -467,11 +467,13 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    await update.message.chat.send_message(
+    payment_message = await update.message.chat.send_message(
         text=text,
         reply_markup=reply_markup,
         parse_mode=ParseMode.HTML
     )
+    payment_message_id = payment_message.message_id
+    pdb.update_payment_message_id(order_code, payment_message_id)
 
     context.user_data.clear()
     return ConversationHandler.END
@@ -531,8 +533,6 @@ async def upd_payment_url_handle(update: Update, context: CallbackContext) -> No
     )
 
     payment_message_id = payment_message.message_id
-    logger.info(payment_message)
-    logger.info(payment_message_id)
     pdb.update_payment_message_id(order_code, payment_message_id)
 
 
