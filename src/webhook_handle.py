@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from fastapi.responses import PlainTextResponse
 import logging
 import config
-import payment
+from other_func import escape_user_data
 import telegram_https
 from fastapi import Request
 from setup import pdb, moscow_tz
@@ -128,11 +128,14 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
         )
 
         user_info = pdb.get_user_by_user_id(user_id)
+        first_name = escape_user_data(user_info.get('first_name', ''))
+        last_name = escape_user_data(user_info.get('last_name', ''))
+        username = escape_user_data(user_info.get('username', ''))
 
         user_data = {
-            "user_id": user_info.get("user_id"),
-            "full_name": f"{user_info.get('first_name', '')} {user_info.get('last_name', '')}".strip(),
-            "username": user_info.get("username"),
+            "user_id": user_id,
+            "full_name": f"{first_name} {last_name}".strip(),
+            "username": username
         }
 
         # Рендерим блок про пользователя
