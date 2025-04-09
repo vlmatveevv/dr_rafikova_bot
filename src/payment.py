@@ -71,46 +71,45 @@ def create_payment_robokassa_test(price, email, num_of_chapter, order_code, orde
         email=email,
         inv_id=order_code,
         out_sum=price,
-        user_id=user_id,           # 👈 кастомное поле
-        formatted_chapter=formatted_chapter,    # 👈 ещё одно кастомное поле
-        order_id=order_id          # 👈 и ещё
+        user_id=user_id,  # 👈 кастомное поле
+        formatted_chapter=formatted_chapter,  # 👈 ещё одно кастомное поле
+        order_id=order_id  # 👈 и ещё
     )
 
     return response.url  # ✅ ВАЖНО: возвращаем строку, а не объект
 
-
-async def create_payment_robokassa(price, email, num_of_chapter, order_code, order_id, user_id):
-    formatted_chapter = f'ch_{num_of_chapter}'
-    course = config.courses.get(formatted_chapter)
-    name = course['name']
-    description = f"Доступ к разделу курса {name}. Заказ #n{order_code}"
-
-    receipt = {
-        "sno": "usn_income",
-        "items": [
-            {
-                "name": f"Доступ к разделу курса {name}",
-                "quantity": 1,
-                "sum": price,
-                "payment_method": "full_prepayment",
-                "payment_object": "service",
-                "tax": "none"
-            }
-        ],
-        "email": email
-    }
-
-    response = await robokassa.generate_protected_payment_link(
-        merchant_comments="no comment",
-        description=description,
-        invoice_type=InvoiceType.ONE_TIME,
-        email=email,
-        inv_id=order_code,
-        out_sum=price,
-        receipt=receipt,
-        user_id=user_id,
-        formatted_chapter=formatted_chapter,
-        order_id=order_id
-    )
-
-    return response.url
+# async def create_payment_robokassa(price, email, num_of_chapter, order_code, order_id, user_id):
+#     formatted_chapter = f'ch_{num_of_chapter}'
+#     course = config.courses.get(formatted_chapter)
+#     name = course['name']
+#     description = f"Доступ к разделу курса {name}. Заказ #n{order_code}"
+#
+#     receipt = {
+#         "sno": "usn_income",
+#         "items": [
+#             {
+#                 "name": f"Доступ к разделу курса {name}",
+#                 "quantity": 1,
+#                 "sum": price,
+#                 "payment_method": "full_prepayment",
+#                 "payment_object": "service",
+#                 "tax": "none"
+#             }
+#         ],
+#         "email": email
+#     }
+#
+#     response = await robokassa.generate_protected_payment_link(
+#         merchant_comments="no comment",
+#         description=description,
+#         invoice_type=InvoiceType.ONE_TIME,
+#         email=email,
+#         inv_id=order_code,
+#         out_sum=price,
+#         receipt=receipt,
+#         user_id=user_id,
+#         formatted_chapter=formatted_chapter,
+#         order_id=order_id
+#     )
+#
+#     return response.url
