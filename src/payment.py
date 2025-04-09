@@ -5,9 +5,9 @@ from robokassa.types import InvoiceType
 
 robokassa = Robokassa(
     merchant_login=config.config_env['MERCHANT_LOGIN_ROBOKASSA'],
-    password1=config.config_env['ROBOKASSA_PASS_1_TEST'],
-    password2=config.config_env['ROBOKASSA_PASS_2_TEST'],
-    is_test=True,
+    password1=config.config_env['ROBOKASSA_PASS_1'],
+    password2=config.config_env['ROBOKASSA_PASS_2'],
+    is_test=False,
     algorithm=HashAlgorithm.md5,
 )
 
@@ -58,7 +58,7 @@ async def create_payment(price, user_id, email, num_of_chapter, order_id, order_
     return payment.confirmation.confirmation_url
 
 
-def create_payment_robokassa(price, email, num_of_chapter, order_code, order_id, user_id):
+def create_payment_robokassa_test(price, email, num_of_chapter, order_code, order_id, user_id):
     formatted_chapter = f'ch_{num_of_chapter}'
     course = config.courses.get(formatted_chapter)
     name = course['name']
@@ -77,3 +77,40 @@ def create_payment_robokassa(price, email, num_of_chapter, order_code, order_id,
     )
 
     return response.url  # ✅ ВАЖНО: возвращаем строку, а не объект
+
+
+async def create_payment_robokassa(price, email, num_of_chapter, order_code, order_id, user_id):
+    formatted_chapter = f'ch_{num_of_chapter}'
+    course = config.courses.get(formatted_chapter)
+    name = course['name']
+    description = f"Доступ к разделу курса {name}. Заказ #n{order_code}"
+
+    receipt = {
+        "sno": "usn_income",
+        "items": [
+            {
+                "name": f"Доступ к разделу курса {name}",
+                "quantity": 1,
+                "sum": price,
+                "payment_method": "full_prepayment",
+                "payment_object": "service",
+                "tax": "none"
+            }
+        ],
+        "email": email
+    }
+
+    response = await robokassa.generate_protected_payment_link(
+        merchant_comments="no comment",
+        description=description,
+        invoice_type=InvoiceType.ONE_TIME,
+        email=email,
+        inv_id=order_code,
+        out_sum=price,
+        receipt=receipt,
+        user_id=user_id,
+        formatted_chapter=formatted_chapter,
+        order_id=order_id
+    )
+
+    return response.url

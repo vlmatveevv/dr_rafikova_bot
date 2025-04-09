@@ -177,7 +177,6 @@ async def my_courses_callback_handle(update: Update, context: CallbackContext) -
     await my_courses_command(update, context)
 
 
-
 async def all_courses_command(update: Update, context: CallbackContext) -> None:
     keyboard = []
 
