@@ -530,7 +530,7 @@ async def upd_payment_url_handle(update: Update, context: CallbackContext) -> No
         parse_mode=ParseMode.HTML
     )
     payment_message_id = payment_message.message_id
-    pdb.update_payment_message_id(payment_message_id)
+    pdb.update_payment_message_id(order_code, payment_message_id)
 
 
 async def handle_join_request(update: Update, context: CallbackContext):
