@@ -64,11 +64,25 @@ def create_payment_robokassa(price, email, num_of_chapter, order_code, order_id,
     name = course['name']
     description = f"Доступ к разделу курса {name}. Заказ #n{order_code}"
 
+    receipt = {
+        "items": [
+            {
+                "Name": description,
+                "Quantity": 1,
+                "Sum": price,
+                "PaymentMethod": "full_prepayment",
+                "PaymentObject": "service",
+                "Tax": "none"
+            }
+        ]
+
+    }
     response = robokassa.generate_open_payment_link(
         merchant_comments="no comment",
         description=description,
         invoice_type=InvoiceType.ONE_TIME,
         email=email,
+        receipt=receipt,
         inv_id=order_code,
         out_sum=price,
         user_id=user_id,  # 👈 кастомное поле

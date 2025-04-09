@@ -52,7 +52,7 @@ async def yookassa_webhook(request: Request, background_tasks: BackgroundTasks):
     channel_name = course['name']
 
     pdb.add_payment(external_payment_id=payment_id, amount=amount, income_amount=income_amount,
-                          payment_method_type=payment_method_type, order_id=order_id)
+                    payment_method_type=payment_method_type, order_id=order_id)
 
     keyboard = [
         [InlineKeyboardButton("Вступить в канал ✅", url=channel_invite_url)],
@@ -98,6 +98,15 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
 
         channel_name = course["name"]
         channel_invite_url = course["channel_invite_link"]
+        payment_message_id = pdb.get_payment_message_id(order_id)
+
+        try:
+            background_tasks.add_task(
+                telegram_https.delete_message,
+                chat_id=user_id,
+                message_id=payment_message_id)
+        except Exception as e:
+            print(f"Ошибка при удалении сообщения: {e}")
 
         # Сохраняем платёж
         pdb.add_payment(

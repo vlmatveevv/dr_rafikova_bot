@@ -519,7 +519,7 @@ async def upd_payment_url_handle(update: Update, context: CallbackContext) -> No
         [InlineKeyboardButton("✅ Подтвердить и оплатить", url=payment_url)]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text(
+    payment_message = await query.edit_message_text(
         text=config.bot_msg['confirm_purchase'].format(
             email=email,
             name=course['name'],
@@ -529,6 +529,8 @@ async def upd_payment_url_handle(update: Update, context: CallbackContext) -> No
         reply_markup=reply_markup,
         parse_mode=ParseMode.HTML
     )
+    payment_message_id = payment_message.message_id
+    pdb.update_payment_message_id(payment_message_id)
 
 
 async def handle_join_request(update: Update, context: CallbackContext):

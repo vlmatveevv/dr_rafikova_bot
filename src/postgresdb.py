@@ -324,6 +324,36 @@ class Database:
             self.conn.rollback()
             raise
 
+    def update_payment_message_id(self, order_code: int, message_id: int):
+        try:
+            with self.conn.cursor() as cursor:
+                cursor.execute("""
+                    UPDATE orders
+                    SET payment_message_id = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE order_code = %s
+                """, (message_id, order_code))
+                self.conn.commit()
+        except Exception as e:
+            print(f"❌ Ошибка при обновлении payment_message_id: {e}")
+            self.conn.rollback()
+            raise
+
+    def get_payment_message_id(self, order_id: int) -> int | None:
+        try:
+            with self.conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT payment_message_id
+                    FROM orders
+                    WHERE order_id = %s
+                """, (order_id,))
+                result = cursor.fetchone()
+                if result:
+                    return result[0]  # может быть None, если не задан
+                return None
+        except Exception as e:
+            print(f"❌ Ошибка при получении payment_message_id: {e}")
+            raise
+
     def check_order_code_unique(self, order_code: int) -> bool:
         """
         Проверяет, существует ли order_code в таблице orders.
