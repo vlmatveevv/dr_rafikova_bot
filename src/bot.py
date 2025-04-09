@@ -209,7 +209,7 @@ async def documents_command(update: Update, context: CallbackContext) -> None:
     chargeback_text = f'<a href="{config.other_cfg["links"]["chargeback"]}">Ознакомиться с заявлением на возврат денежных средств</a>'
     text = person_info_text + "\n\n" + offer_text + "\n\n" + privacy_text + "\n\n" + consent_text + "\n\n" + chargeback_text
 
-    keyboard = [
+    keboard = [
         [InlineKeyboardButton("📲 Главное меню", callback_data="main_menu")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -606,6 +606,39 @@ async def deny_manual_access(update: Update, context: CallbackContext):
     await query.edit_message_text(f"⛔️ Вы отказали в доступе пользователю {user_id_str} к курсу {course_key}.")
 
 
+async def error_handler(update: object, context: CallbackContext) -> None:
+    logger.error("Exception while handling an update:", exc_info=context.error)
+
+    tb_list = traceback.format_exception(None, context.error, context.error.__traceback__)
+    tb_string = "".join(tb_list)
+
+    update_str = update.to_dict() if isinstance(update, Update) else str(update)
+    message_base = (
+        "An exception was raised while handling an update\n"
+        f"<pre>update = {html.escape(json.dumps(update_str, indent=2, ensure_ascii=False))}</pre>\n\n"
+        f"<pre>context.chat_data = {html.escape(str(context.chat_data))}</pre>\n\n"
+        f"<pre>context.user_data = {html.escape(str(context.user_data))}</pre>\n\n"
+    )
+
+    # Разбиение tb_string на части, если общее сообщение превышает 4096 символов
+    max_length = 4096 - len(message_base) - 100  # Вычитаем длину основного сообщения и резервируем место
+    parts = [tb_string[i:i + max_length] for i in range(0, len(tb_string), max_length)]
+
+    # Отправляем базовую часть сообщения
+    await context.bot.send_message(
+        chat_id=config.cfg['ADMIN_CHAT_ID']['MAIN'], text=message_base, parse_mode=ParseMode.HTML,
+        message_thread_id=config.cfg['ADMIN_CHAT_ID']['LOGS']
+    )
+
+    # Отправляем каждую часть traceback по отдельности
+    for part in parts:
+        message = f"<pre>{html.escape(part)}</pre>"
+        await context.bot.send_message(
+            chat_id=config.cfg['ADMIN_CHAT_ID']['MAIN'], text=message, parse_mode=ParseMode.HTML,
+            message_thread_id=config.cfg['ADMIN_CHAT_ID']['LOGS']
+        )
+
+
 async def post_init(application: Application) -> None:
     # Подгружаем команды из main_menu
     menu_commands = [
@@ -670,6 +703,7 @@ def run():
 
     application.add_handler(buy_course_conversation)
     application.add_handler(ChatJoinRequestHandler(handle_join_request))
+    application.add_error_handler(error_handler)
 
     logger.addHandler(logging.StreamHandler())
 
