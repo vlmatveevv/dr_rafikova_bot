@@ -16,6 +16,8 @@ user_info_block: |
   🆔 ID: {{ user_id }}
   {% if full_name %}
   🤗 Имя: {{ full_name }}
+  {% endif %}
   {% if username %}
   🔗 Username: @{{ username }}
+  {% endif %}
   </blockquote>
