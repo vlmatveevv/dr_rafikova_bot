@@ -58,7 +58,7 @@ async def create_payment(price, user_id, email, num_of_chapter, order_id, order_
     return payment.confirmation.confirmation_url
 
 
-def create_payment_robokassa_test(price, email, num_of_chapter, order_code, order_id, user_id):
+def create_payment_robokassa(price, email, num_of_chapter, order_code, order_id, user_id):
     formatted_chapter = f'ch_{num_of_chapter}'
     course = config.courses.get(formatted_chapter)
     name = course['name']
