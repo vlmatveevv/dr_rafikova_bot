@@ -270,7 +270,7 @@ async def buy_chapter_callback_handle(update: Update, context: CallbackContext) 
         return
 
     text = config.bot_msg['buy_chapter_info'].format(
-        name=course['name'],
+        name=course['name'] + course['emoji'],
         description=course['description'],
         price=course['price']
     )
@@ -434,7 +434,7 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
 
     text = config.bot_msg['confirm_purchase'].format(
         email=email,
-        name=course['name'],
+        name=course['name'] + course['emoji'],
         num=num,
         price=course['price'],
     )
@@ -512,7 +512,7 @@ async def upd_payment_url_handle(update: Update, context: CallbackContext) -> No
     payment_message = await query.edit_message_text(
         text=config.bot_msg['confirm_purchase'].format(
             email=email,
-            name=course['name'],
+            name=course['name'] + course['emoji'],
             num=num,
             price=course['price'],
         ),
@@ -577,7 +577,7 @@ async def grant_manual_access_handle(update: Update, context: CallbackContext):
     user_id = int(user_id_str)
     admin_id = query.from_user.id
     course = config.courses.get(course_key)
-    name = course['name']
+    name = course['name'] + course['emoji']
     # Добавим доступ в manual_access
     try:
         pdb.grant_manual_access(user_id=user_id, course_chapter=course_key, granted_by=admin_id)

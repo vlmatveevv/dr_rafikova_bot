@@ -19,7 +19,7 @@ def ch_choose_button(available_courses=None):
             course = config.courses[key]
             num_of_chapter = key.split('_')[1]
             button = InlineKeyboardButton(
-                text=course['name'],
+                text=course['name'] + course['emoji'],
                 callback_data=f'buy_chapter:{num_of_chapter}'
             )
             keyboard.append([button])
