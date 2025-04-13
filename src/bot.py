@@ -270,9 +270,9 @@ async def buy_chapter_callback_handle(update: Update, context: CallbackContext) 
         return
 
     text = config.bot_msg['buy_chapter_info'].format(
+        name=course['name'],
         description=course['description'],
-        price=course['price'],
-        name=course['name']
+        price=course['price']
     )
 
     keyboard = []
