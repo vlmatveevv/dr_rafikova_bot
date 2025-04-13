@@ -158,11 +158,7 @@ async def my_courses_command(update: Update, context: CallbackContext) -> None:
     for course_key in available_courses:
         course = config.courses.get(course_key)
         if course:
-            button = InlineKeyboardButton(
-                text=course["name"],
-                url=course["channel_invite_link"]
-            )
-            keyboard.append([button])  # каждая кнопка в новой строке
+            keyboard = my_keyboard.ch_choose_button(available_courses)
 
     keyboard.extend(my_keyboard.main_menu_button_markup())  # <-- исправлено
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -178,15 +174,16 @@ async def my_courses_callback_handle(update: Update, context: CallbackContext) -
 
 
 async def all_courses_command(update: Update, context: CallbackContext) -> None:
-    keyboard = []
+    # keyboard = []
 
-    for key, course in config.courses.items():
-        num_of_chapter = key.split('_')[1]
-        button = InlineKeyboardButton(
-            text=course['name'],
-            callback_data=f'buy_chapter:{num_of_chapter}'
-        )
-        keyboard.append([button])
+    # for key, course in config.courses.items():
+    #     num_of_chapter = key.split('_')[1]
+    #     button = InlineKeyboardButton(
+    #         text=course['name'],
+    #         callback_data=f'buy_chapter:{num_of_chapter}'
+    #     )
+    #     keyboard.append([button])
+    keyboard = my_keyboard.ch_choose_button()
 
     keyboard.extend(my_keyboard.main_menu_button_markup())  # <-- исправлено
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -248,17 +245,8 @@ async def main_menu_callback_handle(update: Update, context: CallbackContext) ->
 async def buy_courses_callback_handle(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
     await query.answer()
-    keyboard = []
 
-    for key, course in config.courses.items():
-        num_of_chapter = key.split('_')[1]
-        button = InlineKeyboardButton(
-            text=course['name'],
-            callback_data=f'buy_chapter:{num_of_chapter}'
-        )
-        keyboard.append([button])
-
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    reply_markup = InlineKeyboardMarkup(my_keyboard.ch_choose_button())
     await query.edit_message_text(
         text=config.bot_msg['choose_chapter'],
         reply_markup=reply_markup,

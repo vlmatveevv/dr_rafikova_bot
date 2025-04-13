@@ -10,6 +10,23 @@ def main_menu_button_markup():
     return keyboard
 
 
+def ch_choose_button(available_courses=None):
+    chapter_order = ['ch_7', 'ch_1', 'ch_2', 'ch_3', 'ch_4', 'ch_5', 'ch_6']
+    keyboard = []
+
+    for key in chapter_order:
+        if available_courses is None or key in available_courses:
+            course = config.courses[key]
+            num_of_chapter = key.split('_')[1]
+            button = InlineKeyboardButton(
+                text=course['name'],
+                callback_data=f'buy_chapter:{num_of_chapter}'
+            )
+            keyboard.append([button])
+
+    return keyboard
+
+
 def main_menu_items_button_markup():
     main_menu = config.bot_btn['main_menu']
 
