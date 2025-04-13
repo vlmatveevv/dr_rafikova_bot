@@ -123,7 +123,7 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
         background_tasks.add_task(
             telegram_https.send_message,
             user_id=user_id,
-            text=f"🎉 Вы успешно оплатили курс <b>{channel_name}</b>!\nНажмите кнопку ниже, чтобы вступить в канал:",
+            text=f"🎉 Вы успешно оплатили курс\n<b>{channel_name}</b>!\n\nНажмите кнопку ниже, чтобы вступить в канал:",
             reply_markup=reply_markup
         )
 
