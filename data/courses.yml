@@ -14,8 +14,7 @@ ch_1:
     • Планировании при ожирении
   channel_id: -1002334465489
   channel_invite_link: 'https://t.me/+PIcpYfhOBJhkYjUy'
-  price_fake: 2380
-  price_real: 10
+  price: 2380
 
 ch_2:
   name: "ПЕРВЫЙ ТРИМЕСТ 🤰"
@@ -36,8 +35,7 @@ ch_2:
     • Питание
   channel_id: -1002351564117
   channel_invite_link: 'https://t.me/+QDrAgKC-4J5kNzk6'
-  price_fake: 1190
-  price_real: 11
+  price: 1190
 
 ch_3:
   name: "ВТОРОЙ ТРИМЕСТ 😍"
@@ -56,8 +54,7 @@ ch_3:
     • Артериальное давление
   channel_id: -1002316647150
   channel_invite_link: 'https://t.me/+zetjMTtR44BkYjli'
-  price_fake: 1190
-  price_real: 10
+  price: 1190
 
 ch_4:
   name: "ТРЕТИЙ ТРИМЕСТ ❤️"
@@ -76,8 +73,7 @@ ch_4:
     • Ринит у беременных
   channel_id: -1002322120145
   channel_invite_link: 'https://t.me/+m6xVeGfmO7QwNjky'
-  price_fake: 1190
-  price_real: 11
+  price: 1190
 
 ch_5:
   name: "РОДЫ 🤱🏼"
@@ -96,8 +92,7 @@ ch_5:
     • Набор для родов
   channel_id: -1002326520548
   channel_invite_link: 'https://t.me/+346bcoP9lEQ5MGM6'
-  price_fake: 1190
-  price_real: 10
+  price: 1190
 
 ch_6:
   name: "ПОСЛЕРОДОВОЕ ВОССТАНОВЛЕНИЕ🧘‍"
@@ -115,8 +110,7 @@ ch_6:
     • Прием гинеколога
   channel_id: -1002451685806
   channel_invite_link: 'https://t.me/+woMpLkE1ID8xYWJi'
-  price_fake: 11
-  price_real: 1190
+  price: 1190
 
 ch_7:
   name: "ПОЛНЫЙ КУРС (разделы с 1-6) 🔥"
@@ -144,5 +138,4 @@ ch_7:
     <b><u>+ 🔥БОНУСНЫЕ УРОКИ🔥 «Мышцы тазового дна» от эксперта.</u></b>
   channel_id: -1002479019154
   channel_invite_link: 'https://t.me/+L5s7ni6MlqllOThi'
-  price_fake: 6990
-  price_real: 12
+  price: 6990
