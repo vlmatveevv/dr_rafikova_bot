@@ -11,9 +11,9 @@ hello: |
 choose_chapter: "Выберите раздел"
 buy_chapter_info: |
   <b>{name}
+  
   Содержание раздела:</b>
   {description}
-
   <b>Стоимость:</b> {price} ₽
 confirm_purchase: |
   <b>Подтверждение</b>
