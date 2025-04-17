@@ -456,7 +456,7 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
     keyboard = [
         [InlineKeyboardButton("✅ Подтвердить и оплатить", url=payment_url)],
         # [InlineKeyboardButton("🔄 Обновить платежную ссылку", callback_data=f'upd_payment_url:{order_code}')],
-        [InlineKeyboardButton("🚫 Отмена", callback_data='cancel')]
+        [InlineKeyboardButton("🚫 Отмена", callback_data='main_menu')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
