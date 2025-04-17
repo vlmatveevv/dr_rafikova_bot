@@ -368,6 +368,7 @@ async def handle_privacy_agree(update: Update, context: CallbackContext) -> int:
 
     keyboard = [
         [InlineKeyboardButton("✅ Я согласен", callback_data=f"agree_newsletter:{order_code}")],
+        [InlineKeyboardButton("❌ Не согласен", callback_data=f"disagree_newsletter:{order_code}")],
         [InlineKeyboardButton("🚫 Отмена", callback_data='cancel')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -386,7 +387,11 @@ async def handle_privacy_agree(update: Update, context: CallbackContext) -> int:
 async def handle_newsletter_agree(update: Update, context: CallbackContext) -> int:
     query = update.callback_query
     await query.answer()
-    order_code = query.data.split(':')[1]
+    agreement_newsletter, order_code = query.data.split(':')
+    if agreement_newsletter == 'agree_newsletter':
+        agreement_newsletter_bool = True
+    else:
+        agreement_newsletter_bool = False
 
     keyboard = [
         [InlineKeyboardButton("🚫 Отмена", callback_data='cancel')]
@@ -394,7 +399,7 @@ async def handle_newsletter_agree(update: Update, context: CallbackContext) -> i
     reply_markup = InlineKeyboardMarkup(keyboard)
     email_msg = await query.edit_message_text(text="📧 Введите ваш e-mail для отправки чека:",
                                               reply_markup=reply_markup)
-    pdb.update_agreed_newsletter(order_code, True)
+    pdb.update_agreed_newsletter(order_code, agreement_newsletter_bool)
 
     context.user_data['email_msg'] = email_msg
     context.user_data['order_code'] = order_code
@@ -642,7 +647,8 @@ buy_course_conversation = ConversationHandler(
     states={
         AGREE_OFFER: [CallbackQueryHandler(handle_offer_agree, pattern="^agree_offer:")],
         AGREE_PRIVACY: [CallbackQueryHandler(handle_privacy_agree, pattern="^agree_privacy:")],
-        AGREE_NEWSLETTER: [CallbackQueryHandler(handle_newsletter_agree, pattern="^agree_newsletter:")],
+        AGREE_NEWSLETTER: [CallbackQueryHandler(handle_newsletter_agree,
+                                                pattern="^(agree_newsletter:|disagree_newsletter:)")],
         ASK_EMAIL: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_email_handle)],
     },
     fallbacks=[CallbackQueryHandler(cancel_payment_handle, pattern="^cancel$")],
