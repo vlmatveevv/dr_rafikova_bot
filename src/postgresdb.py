@@ -192,10 +192,40 @@ class Database:
             print(f"Ошибка при получении курсов: {e}")
             return []
 
+    # def get_all_user_courses(self, user_id: int) -> list:
+    #     """
+    #     Возвращает список всех курсов, к которым у пользователя есть доступ:
+    #     - оплаченные
+    #     - выданные вручную (manual_access)
+    #
+    #     :param user_id: Telegram user ID
+    #     :return: список course_chapter
+    #     """
+    #     try:
+    #         with self.conn.cursor() as cursor:
+    #             query = """
+    #                 SELECT DISTINCT course_chapter FROM (
+    #                     SELECT o.course_chapter
+    #                     FROM orders o
+    #                     JOIN payments p ON o.order_id = p.order_id
+    #                     WHERE o.user_id = %s
+    #                     UNION
+    #                     SELECT ma.course_chapter
+    #                     FROM manual_access ma
+    #                     WHERE ma.user_id = %s
+    #                 ) AS combined
+    #             """
+    #             cursor.execute(query, (user_id, user_id))
+    #             result = cursor.fetchall()
+    #             return [row[0] for row in result]
+    #     except Exception as e:
+    #         print(f"❌ Ошибка при получении всех доступных курсов: {e}")
+    #         return []
+
     def get_all_user_courses(self, user_id: int) -> list:
         """
         Возвращает список всех курсов, к которым у пользователя есть доступ:
-        - оплаченные
+        - оплаченные (в orders)
         - выданные вручную (manual_access)
 
         :param user_id: Telegram user ID
@@ -204,13 +234,13 @@ class Database:
         try:
             with self.conn.cursor() as cursor:
                 query = """
-                    SELECT DISTINCT course_chapter FROM (
+                    SELECT DISTINCT unnest(course_chapter) AS chapter FROM (
                         SELECT o.course_chapter
                         FROM orders o
                         JOIN payments p ON o.order_id = p.order_id
                         WHERE o.user_id = %s
-                        UNION
-                        SELECT ma.course_chapter
+                        UNION ALL
+                        SELECT ARRAY[ma.course_chapter]  -- manual_access.course_chapter — строка
                         FROM manual_access ma
                         WHERE ma.user_id = %s
                     ) AS combined

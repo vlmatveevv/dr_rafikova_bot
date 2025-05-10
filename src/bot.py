@@ -174,15 +174,6 @@ async def my_courses_callback_handle(update: Update, context: CallbackContext) -
 
 
 async def all_courses_command(update: Update, context: CallbackContext) -> None:
-    # keyboard = []
-
-    # for key, course in config.courses.items():
-    #     num_of_chapter = key.split('_')[1]
-    #     button = InlineKeyboardButton(
-    #         text=course['name'],
-    #         callback_data=f'buy_chapter:{num_of_chapter}'
-    #     )
-    #     keyboard.append([button])
     keyboard = my_keyboard.ch_choose_button()
 
     keyboard.extend(my_keyboard.main_menu_button_markup())  # <-- исправлено

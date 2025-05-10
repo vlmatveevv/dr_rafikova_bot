@@ -3,6 +3,7 @@ chapter: "Раздел {num_of_chapter}"
 go_to_pay: "Перейти к оплате"
 go_to_channel: "Перейти в канал"
 go_back: "Назад"
+choose_multi: "Выбрать несколько"
 
 main_menu:
   all_courses: "Все разделы"
