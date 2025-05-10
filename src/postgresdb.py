@@ -302,10 +302,36 @@ class Database:
             print(f"Ошибка при проверке оплаты курса: {e}")
             return False
 
-    def create_order(self, user_id: int, course_chapter: str, order_code: int) -> int:
+    # def create_order(self, user_id: int, course_chapter: str, order_code: int) -> int:
+    #     """
+    #     Создает заказ в таблице orders и возвращает order_id.
+    #     Email будет добавлен позже.
+    #     """
+    #     try:
+    #         with self.conn.cursor() as cursor:
+    #             query = """
+    #                 INSERT INTO orders (user_id, course_chapter, order_code)
+    #                 VALUES (%s, %s, %s)
+    #                 RETURNING order_id;
+    #             """
+    #             cursor.execute(query, (user_id, course_chapter, order_code))
+    #             order_id = cursor.fetchone()[0]
+    #             self.conn.commit()
+    #             return order_id
+    #     except Exception as e:
+    #         print(f"❌ Ошибка при создании заказа: {e}")
+    #         self.conn.rollback()
+    #         raise
+
+    def create_order(self, user_id: int, course_chapter: list[str], order_code: int) -> int:
         """
         Создает заказ в таблице orders и возвращает order_id.
         Email будет добавлен позже.
+
+        :param user_id: Telegram user ID
+        :param course_chapter: Список курсов, например: ['ch1', 'ch3']
+        :param order_code: Уникальный код заказа
+        :return: order_id
         """
         try:
             with self.conn.cursor() as cursor:

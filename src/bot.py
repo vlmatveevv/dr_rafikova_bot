@@ -304,7 +304,7 @@ async def pay_chapter_callback_handle(update: Update, context: CallbackContext) 
         return ConversationHandler.END
 
     order_code = other_func.generate_order_number()
-    order_id = pdb.create_order(user_id=user_id, course_chapter=course_mask, order_code=order_code)
+    order_id = pdb.create_order(user_id=user_id, course_chapter=[course_mask], order_code=order_code)
     context.user_data['selected_course'] = course
     context.user_data['chapter_number'] = num_of_chapter
     context.user_data['order_id'] = order_id
