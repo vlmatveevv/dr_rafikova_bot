@@ -252,6 +252,31 @@ class Database:
             print(f"❌ Ошибка при получении всех доступных курсов: {e}")
             return []
 
+    # def has_paid_course(self, user_id: int, course_chapter: str) -> bool:
+    #     """
+    #     Проверяет, оплатил ли пользователь указанный курс.
+    #
+    #     :param user_id: ID пользователя.
+    #     :param course_chapter: Название курса/раздела.
+    #     :return: True, если оплата есть, иначе False.
+    #     """
+    #     try:
+    #         with self.conn.cursor() as cursor:
+    #             query = """
+    #                 SELECT EXISTS (
+    #                     SELECT 1
+    #                     FROM orders o
+    #                     JOIN payments p ON o.order_id = p.order_id
+    #                     WHERE o.user_id = %s AND o.course_chapter = %s
+    #                 )
+    #             """
+    #             cursor.execute(query, (user_id, course_chapter))
+    #             result = cursor.fetchone()
+    #             return result[0]  # True или False
+    #     except Exception as e:
+    #         print(f"Ошибка при проверке оплаты курса: {e}")
+    #         return False
+
     def has_paid_course(self, user_id: int, course_chapter: str) -> bool:
         """
         Проверяет, оплатил ли пользователь указанный курс.
@@ -267,7 +292,7 @@ class Database:
                         SELECT 1
                         FROM orders o
                         JOIN payments p ON o.order_id = p.order_id
-                        WHERE o.user_id = %s AND o.course_chapter = %s
+                        WHERE o.user_id = %s AND %s = ANY(o.course_chapter)
                     )
                 """
                 cursor.execute(query, (user_id, course_chapter))
