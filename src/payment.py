@@ -105,7 +105,7 @@ def create_payment_robokassa(price, email, num_of_chapter, order_code, order_id,
             continue
 
         items.append({
-            "Name": f"Доступ к обучающему разделу №{num}",
+            "Name": f"Доступ к разделу курса {course['name']}",
             "Quantity": 1,
             "Sum": course['price'],
             "PaymentMethod": "full_prepayment",
