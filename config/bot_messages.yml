@@ -19,6 +19,8 @@ confirm_purchase_header: |
   <b>Подтверждение</b>
 
   Ваш эл. адрес: {email}
+  
+  Вы покупаете раздел(-ы) курса:
 
 confirm_purchase_course_line: |
   • {name} — <b>{price} ₽</b>
