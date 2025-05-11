@@ -542,6 +542,7 @@ async def buy_multiply_callback_handle(update: Update, context: CallbackContext)
 
     user_id = query.from_user.id
     not_bought_courses = pdb.get_not_bought_courses(user_id)
+    not_bought_courses = [ch for ch in not_bought_courses if ch != "ch_7"]
 
     if not not_bought_courses:
         text = "Вы уже приобрели все доступные курсы."
