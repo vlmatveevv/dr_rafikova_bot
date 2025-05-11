@@ -176,7 +176,8 @@ async def my_courses_callback_handle(update: Update, context: CallbackContext) -
 async def all_courses_command(update: Update, context: CallbackContext) -> None:
     keyboard = my_keyboard.ch_choose_button()
 
-    keyboard.extend(my_keyboard.main_menu_button_markup())  # <-- исправлено
+    keyboard.extend(my_keyboard.buy_multiply_button_markup())
+    keyboard.extend(my_keyboard.main_menu_button_markup())
     reply_markup = InlineKeyboardMarkup(keyboard)
     text = config.bot_msg['choose_chapter']
     await send_or_edit_message(update, context, text, reply_markup)
@@ -235,8 +236,9 @@ async def main_menu_callback_handle(update: Update, context: CallbackContext) ->
 async def buy_courses_callback_handle(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
     await query.answer()
-
-    reply_markup = InlineKeyboardMarkup(my_keyboard.ch_choose_button())
+    keyboard = my_keyboard.ch_choose_button()
+    keyboard.extend(my_keyboard.buy_multiply_button_markup())
+    reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text(
         text=config.bot_msg['choose_chapter'],
         reply_markup=reply_markup,

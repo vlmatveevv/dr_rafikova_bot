@@ -4,8 +4,16 @@ import config
 
 def main_menu_button_markup():
     keyboard = [[InlineKeyboardButton(
-        text="📲 Главное меню",
+        text=config.bot_btn['main_menu_main'],
         callback_data='main_menu'
+    )]]
+    return keyboard
+
+
+def buy_multiply_button_markup():
+    keyboard = [[InlineKeyboardButton(
+        text=config.bot_btn['buy_multiply'],
+        callback_data='buy_multiply'
     )]]
     return keyboard
 
