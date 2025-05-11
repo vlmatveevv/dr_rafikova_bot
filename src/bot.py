@@ -450,18 +450,20 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
     email = update.message.text.strip()
 
     if not is_valid_email(email):
-        keyboard = [
-            [InlineKeyboardButton("🚫 Отмена", callback_data='cancel')]
-        ]
+        keyboard = [[InlineKeyboardButton("🚫 Отмена", callback_data='cancel')]]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text(text="Некорректный e-mail. Пожалуйста, введите корректный e-mail:",
-                                        reply_markup=reply_markup)
+        await update.message.reply_text(
+            text="Некорректный e-mail. Пожалуйста, введите корректный e-mail:",
+            reply_markup=reply_markup
+        )
         return ASK_EMAIL
 
     order_code = context.user_data['order_code']
     order_id = context.user_data['order_id']
+    selected_courses = context.user_data.get('selected_courses', [])  # список course_key
     pdb.update_email(order_code, email)
     context.user_data['email'] = email
+
     email_msg = context.user_data.get('email_msg')
     user_id = update.effective_user.id
 
@@ -472,20 +474,33 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
     except Exception as e:
         logger.error(f"Ошибка удаления сообщения: {e}")
 
-    course = context.user_data['selected_course']
-    num = context.user_data['chapter_number']
+    text_lines = []
+    total_price = 0
 
-    text = config.bot_msg['confirm_purchase'].format(
-        email=email,
-        name=course['name'] + course['emoji'],
-        num=num,
-        price=course['price'],
-    )
+    for course_key in selected_courses:
+        course = config.courses[course_key]
+        num = course_key.split('_')[1]
+        price = course['price']
+        total_price += price
 
+        course_text = config.bot_msg['confirm_purchase'].format(
+            email=email,
+            name=course['name'] + course['emoji'],
+            num=num,
+            price=price
+        )
+        text_lines.append(course_text)
+
+    # Добавляем итог
+    text_lines.append(f"<b>💰 Общая сумма к оплате: {total_price} ₽</b>")
+
+    text = "\n\n".join(text_lines)
+
+    # Создаём платёж (убедись, что функция поддерживает многокурсовую оплату)
     payment_url = payment.create_payment_robokassa(
-        price=course['price'],
+        price=total_price,
         email=email,
-        num_of_chapter=num,
+        num_of_chapter=",".join([key.split('_')[1] for key in selected_courses]),
         order_code=order_code,
         order_id=order_id,
         user_id=user_id
@@ -493,7 +508,6 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
 
     keyboard = [
         [InlineKeyboardButton("✅ Подтвердить и оплатить", url=payment_url)],
-        # [InlineKeyboardButton("🔄 Обновить платежную ссылку", callback_data=f'upd_payment_url:{order_code}')],
         [InlineKeyboardButton("🚫 Отмена", callback_data='main_menu')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -508,7 +522,6 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
 
     context.user_data.clear()
     return ConversationHandler.END
-
 
 # Отмена
 async def cancel_payment_handle(update: Update, context: CallbackContext) -> int:
