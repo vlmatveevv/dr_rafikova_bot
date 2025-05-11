@@ -256,13 +256,13 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
         admin_template_str = config.admin_msg['admin_payment_notification']
         admin_payment_notification_text = Template(admin_template_str).render(
             user_info_block=user_info_block,
-            channel_name=", ".join(course_names),
+            channel_names=course_names,
             out_sum=out_sum,
             payment_method_type=payment_method_type,
             income_amount=income_amount,
             user_id=user_id,
             order_code=inv_id,
-            formatted_chapter=formatted_chapter
+            formatted_chapters=formatted_chapters
         )
 
         # Уведомление администратору

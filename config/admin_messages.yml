@@ -2,13 +2,20 @@ admin_payment_notification: |
   💸 <b>Новая оплата</b>
 
   {{ user_info_block }}
-
-  📦 <b>Канал:</b> {{ channel_name }}
+  
+  📦 <b>Канал(-ы):</b>
+  {% for name in channel_names %}
+  {{ name }}
+  {% endfor %}
+  
   💰 <b>Сумма:</b> {{ out_sum }}₽
   💳 <b>Метод оплаты:</b> {{ payment_method_type }}
   💸 <b>Чистый доход:</b> {{ income_amount }}₽
-
-  #id{{ user_id }} #n{{ order_code }} #{{ formatted_chapter }}
+  
+  #id{{ user_id }} #n{{ order_code }}
+  {% for tag in formatted_chapters %}
+  #{{ tag }}
+  {% endfor %}
 
 user_info_block: |
   <b>👤 Пользователь:</b>
