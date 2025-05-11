@@ -760,7 +760,8 @@ def run():
 
     application.add_handler(CallbackQueryHandler(main_menu_callback_handle, pattern="^main_menu$"))
     application.add_handler(CallbackQueryHandler(my_courses_callback_handle, pattern="^my_courses$"))
-    application.add_handler(CallbackQueryHandler(all_courses_callback_handle, pattern="^all_courses$"))
+    application.add_handler(CallbackQueryHandler(all_courses_callback_handle,
+                                                 pattern=r"^(all_courses|go_back_buy_multiply)$"))
     application.add_handler(CallbackQueryHandler(documents_callback_handle, pattern="^documents$"))
     application.add_handler(CallbackQueryHandler(support_callback_handle, pattern="^support$"))
 
