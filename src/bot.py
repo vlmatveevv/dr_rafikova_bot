@@ -501,7 +501,7 @@ async def buy_multiply_callback_handle(update: Update, context: CallbackContext)
         keyboard += my_keyboard.buy_multiply_menu_items_button()
         keyboard.extend(my_keyboard.main_menu_button_markup())
         reply_markup = InlineKeyboardMarkup(keyboard)
-        text = "Выберите главы, которые хотите купить. Нажмите ещё раз, чтобы снять выбор."
+        text = "Выберите разделы, которые хотите купить. Нажмите ещё раз, чтобы снять выбор."
 
     await query.edit_message_text(
         text=text,
@@ -544,6 +544,11 @@ async def toggle_multi_buy_chapter(update: Update, context: CallbackContext) -> 
         reply_markup=reply_markup,
         parse_mode=ParseMode.HTML
     )
+
+
+async def clear_selected_multi_buy_callback_handle(update: Update, context: CallbackContext) -> None:
+    context.user_data.pop("multi_buy_selected", None)
+    await buy_multiply_callback_handle(update, context)
 
 
 async def upd_payment_url_handle(update: Update, context: CallbackContext) -> None:
@@ -747,6 +752,9 @@ def run():
     application.add_handler(CallbackQueryHandler(buy_multiply_callback_handle, pattern="^buy_multiply$"))
 
     application.add_handler(CallbackQueryHandler(toggle_multi_buy_chapter, pattern="^multi_buy_chapter:"))
+
+    application.add_handler(CallbackQueryHandler(clear_selected_multi_buy_callback_handle,
+                                                 pattern="^clear_buy_multiply$"))
 
     application.add_handler(CallbackQueryHandler(upd_payment_url_handle, pattern="^upd_payment_url:"))
 
