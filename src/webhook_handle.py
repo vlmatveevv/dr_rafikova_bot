@@ -66,6 +66,110 @@ async def yookassa_webhook(request: Request, background_tasks: BackgroundTasks):
     )
     return {"status": "ok"}
 
+#
+# @app.post("/webhook/robokassa/", response_class=PlainTextResponse)
+# async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks):
+#     form = await request.form()
+#     data = dict(form)
+#     logger.info(f"📥 Robokassa webhook data: {data}")
+#
+#     try:
+#         inv_id = int(data.get("InvId"))  # Это order_code
+#         out_sum = float(data.get("OutSum", 0))
+#         payment_method_type = data.get("PaymentMethod", "unknown")
+#         fee = float(data.get("Fee", 0.0))
+#         income_amount = out_sum - fee
+#
+#         # Извлекаем данные из shp_
+#         user_id = int(data.get("shp_user_id"))
+#         order_id = int(data.get("shp_order_id"))
+#         formatted_chapter = data.get("shp_formatted_chapter")
+#
+#         # Проверка по order_code (inv_id)
+#         if pdb.payment_exists_by_order_code(inv_id):
+#             logger.info(f"🔁 Платёж по order_code={inv_id} уже обработан. Пропускаем.")
+#             return "OK"
+#
+#         # Проверка курса
+#         course = config.courses.get(formatted_chapter)
+#         if not course:
+#             logger.error(f"❌ Курс по ключу '{formatted_chapter}' не найден.")
+#             return "OK"
+#
+#         channel_name = course["name"]
+#         channel_invite_url = course["channel_invite_link"]
+#         payment_message_id = pdb.get_payment_message_id(order_id)
+#
+#         try:
+#             background_tasks.add_task(
+#                 telegram_https.delete_message,
+#                 chat_id=user_id,
+#                 message_id=payment_message_id)
+#         except Exception as e:
+#             print(f"Ошибка при удалении сообщения: {e}")
+#
+#         # Сохраняем платёж
+#         pdb.add_payment(
+#             amount=out_sum,
+#             income_amount=income_amount,
+#             payment_method_type=payment_method_type,
+#             order_id=order_id
+#         )
+#
+#         # Кнопка + сообщение
+#         keyboard = [[InlineKeyboardButton("Вступить в канал ✅", url=channel_invite_url)]]
+#         reply_markup = InlineKeyboardMarkup(keyboard)
+#
+#         background_tasks.add_task(
+#             telegram_https.send_message,
+#             user_id=user_id,
+#             text=f"🎉 Вы успешно оплатили курс\n<b>{channel_name}</b>!\n\nНажмите кнопку ниже, чтобы вступить в канал:",
+#             reply_markup=reply_markup
+#         )
+#
+#         user_info = pdb.get_user_by_user_id(user_id)
+#         first_name = escape_user_data(user_info.get('first_name', ''))
+#         last_name = escape_user_data(user_info.get('last_name', ''))
+#         username = escape_user_data(user_info.get('username', ''))
+#
+#         user_data = {
+#             "user_id": user_id,
+#             "full_name": f"{first_name} {last_name}".strip(),
+#             "username": username
+#         }
+#
+#         # Рендерим блок про пользователя
+#         user_template_str = config.admin_msg['user_info_block']
+#         user_info_block = Template(user_template_str).render(**user_data)
+#
+#         # Рендерим полное сообщение через Jinja2
+#         admin_template_str = config.admin_msg['admin_payment_notification']
+#         admin_payment_notification_text = Template(admin_template_str).render(
+#             user_info_block=user_info_block,
+#             channel_name=channel_name,
+#             out_sum=out_sum,
+#             payment_method_type=payment_method_type,
+#             income_amount=income_amount,
+#             user_id=user_id,
+#             order_code=inv_id,
+#             formatted_chapter=formatted_chapter
+#         )
+#
+#         # Отправка сообщения админу
+#         background_tasks.add_task(
+#             telegram_https.send_message,
+#             user_id=config.cfg['ADMIN_CHAT_ID']['MAIN'],
+#             text=admin_payment_notification_text,
+#             message_thread_id=config.cfg['ADMIN_CHAT_ID']['PAYMENTS']
+#         )
+#
+#         logger.info(f"✅ Платёж InvId={inv_id} от user_id={user_id} успешно обработан.")
+#         return "OK"
+#
+#     except Exception as e:
+#         logger.error(f"❗ Ошибка обработки Robokassa webhook: {e}")
+#         return "OK"
+
 
 @app.post("/webhook/robokassa/", response_class=PlainTextResponse)
 async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks):
@@ -80,33 +184,25 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
         fee = float(data.get("Fee", 0.0))
         income_amount = out_sum - fee
 
-        # Извлекаем данные из shp_
         user_id = int(data.get("shp_user_id"))
         order_id = int(data.get("shp_order_id"))
         formatted_chapter = data.get("shp_formatted_chapter")
 
-        # Проверка по order_code (inv_id)
+        # Проверка: уже обработан?
         if pdb.payment_exists_by_order_code(inv_id):
             logger.info(f"🔁 Платёж по order_code={inv_id} уже обработан. Пропускаем.")
             return "OK"
 
-        # Проверка курса
-        course = config.courses.get(formatted_chapter)
-        if not course:
-            logger.error(f"❌ Курс по ключу '{formatted_chapter}' не найден.")
-            return "OK"
-
-        channel_name = course["name"]
-        channel_invite_url = course["channel_invite_link"]
-        payment_message_id = pdb.get_payment_message_id(order_id)
-
+        # Удаляем сообщение об оплате (если было)
         try:
+            payment_message_id = pdb.get_payment_message_id(order_id)
             background_tasks.add_task(
                 telegram_https.delete_message,
                 chat_id=user_id,
-                message_id=payment_message_id)
+                message_id=payment_message_id
+            )
         except Exception as e:
-            print(f"Ошибка при удалении сообщения: {e}")
+            logger.warning(f"⚠️ Не удалось удалить сообщение об оплате: {e}")
 
         # Сохраняем платёж
         pdb.add_payment(
@@ -116,17 +212,31 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
             order_id=order_id
         )
 
-        # Кнопка + сообщение
-        keyboard = [[InlineKeyboardButton("Вступить в канал ✅", url=channel_invite_url)]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
+        # Разбиваем курсы
+        formatted_chapters = formatted_chapter.split(',')
+        course_names = []
+        for chapter_key in formatted_chapters:
+            course = config.courses.get(chapter_key)
+            if not course:
+                logger.warning(f"❌ Курс по ключу '{chapter_key}' не найден.")
+                continue
 
-        background_tasks.add_task(
-            telegram_https.send_message,
-            user_id=user_id,
-            text=f"🎉 Вы успешно оплатили курс\n<b>{channel_name}</b>!\n\nНажмите кнопку ниже, чтобы вступить в канал:",
-            reply_markup=reply_markup
-        )
+            course_names.append(course["name"])
+            channel_name = course["name"]
+            channel_invite_url = course["channel_invite_link"]
 
+            keyboard = [[InlineKeyboardButton("Вступить в канал ✅", url=channel_invite_url)]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            background_tasks.add_task(
+                telegram_https.send_message,
+                user_id=user_id,
+                text=f"🎉 Вы успешно оплатили курс <b>{channel_name}</b>!\n\n"
+                     f"Нажмите кнопку ниже, чтобы вступить в канал:",
+                reply_markup=reply_markup
+            )
+
+        # Подготовка данных о пользователе
         user_info = pdb.get_user_by_user_id(user_id)
         first_name = escape_user_data(user_info.get('first_name', ''))
         last_name = escape_user_data(user_info.get('last_name', ''))
@@ -142,11 +252,11 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
         user_template_str = config.admin_msg['user_info_block']
         user_info_block = Template(user_template_str).render(**user_data)
 
-        # Рендерим полное сообщение через Jinja2
+        # Рендерим общее сообщение админу
         admin_template_str = config.admin_msg['admin_payment_notification']
         admin_payment_notification_text = Template(admin_template_str).render(
             user_info_block=user_info_block,
-            channel_name=channel_name,
+            channel_name=", ".join(course_names),
             out_sum=out_sum,
             payment_method_type=payment_method_type,
             income_amount=income_amount,
@@ -155,7 +265,7 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
             formatted_chapter=formatted_chapter
         )
 
-        # Отправка сообщения админу
+        # Уведомление администратору
         background_tasks.add_task(
             telegram_https.send_message,
             user_id=config.cfg['ADMIN_CHAT_ID']['MAIN'],
