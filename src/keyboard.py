@@ -72,13 +72,13 @@ def main_menu_items_button_markup():
     return InlineKeyboardMarkup(buttons)
 
 
-def buy_multiply_menu_items_button_markup():
+def buy_multiply_menu_items_button():
     buy_multiply_menu = config.bot_btn['buy_multiply']['menu']
 
     # Каждая кнопка — это (название, callback_data)
     buttons = [
-        [InlineKeyboardButton(text=label, callback_data=key)]
+        [InlineKeyboardButton(text=label, callback_data=f'{key}_buy_multiply')]
         for key, label in buy_multiply_menu.items()
     ]
 
-    return InlineKeyboardMarkup(buttons)
+    return buttons

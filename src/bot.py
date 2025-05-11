@@ -499,8 +499,7 @@ async def buy_multiply_callback_handle(update: Update, context: CallbackContext)
             selected=selected
         )
         keyboard.extend(my_keyboard.main_menu_button_markup())
-        keyboard.extend(my_keyboard.buy_multiply_menu_items_button_markup())
-        reply_markup = InlineKeyboardMarkup(keyboard)
+        reply_markup = InlineKeyboardMarkup(my_keyboard.buy_multiply_menu_items_button() + keyboard)
         text = "Выберите главы, которые хотите купить. Нажмите ещё раз, чтобы снять выбор."
 
     await query.edit_message_text(
@@ -536,8 +535,7 @@ async def toggle_multi_buy_chapter(update: Update, context: CallbackContext) -> 
         selected=selected
     )
     keyboard.extend(my_keyboard.main_menu_button_markup())
-    keyboard.extend(my_keyboard.buy_multiply_menu_items_button_markup())
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    reply_markup = InlineKeyboardMarkup(my_keyboard.buy_multiply_menu_items_button()+keyboard)
 
     await query.edit_message_text(
         text="Выберите разделы, которые хотите купить. Нажмите ещё раз, чтобы снять выбор.",
@@ -761,7 +759,7 @@ def run():
 
     application.add_handler(buy_course_conversation)
     application.add_handler(ChatJoinRequestHandler(handle_join_request))
-    application.add_error_handler(error_handler)
+    # application.add_error_handler(error_handler)
 
     logger.addHandler(logging.StreamHandler())
 
