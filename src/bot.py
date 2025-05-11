@@ -326,6 +326,52 @@ async def pay_chapter_callback_handle(update: Update, context: CallbackContext) 
         parse_mode=ParseMode.HTML,
         disable_web_page_preview=True
     )
+    # return AGREE_OFFER
+    return await start_payment_handle(update, context, [course_mask])
+
+
+async def confirm_multi_buy_handle(update: Update, context: CallbackContext) -> int:
+    query = update.callback_query
+    await query.answer()
+
+    selected_courses = context.user_data.get("multi_buy_selected", [])
+    user_id = query.from_user.id
+
+    if not selected_courses:
+        await query.edit_message_text("❗️Вы не выбрали ни одного курса.")
+        return ConversationHandler.END
+
+    context.user_data['is_in_conversation'] = True
+    context.user_data['multi_buy_selected'] = selected_courses
+
+    # Переход в общий обработчик запуска оплаты
+    return await start_payment_handle(update, context, selected_courses)
+
+
+async def start_payment_handle(update: Update, context: CallbackContext, selected_courses: list) -> int:
+    query = update.callback_query
+    user_id = query.from_user.id
+
+    order_code = other_func.generate_order_number()
+    order_id = pdb.create_order(user_id=user_id, course_chapter=selected_courses, order_code=order_code)
+
+    context.user_data['selected_courses'] = selected_courses
+    context.user_data['order_id'] = order_id
+    context.user_data['order_code'] = order_code
+
+    keyboard = [
+        [InlineKeyboardButton("✅ Принимаю", callback_data=f"agree_offer:{order_code}")],
+        [InlineKeyboardButton("🚫 Отмена", callback_data='cancel')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await query.edit_message_text(
+        text="📄 Я ознакомился и принимаю условия Публичной оферты.\n\n"
+             f'<a href="{config.other_cfg["links"]["offer"]}">Открыть оферту</a>',
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.HTML,
+        disable_web_page_preview=True
+    )
     return AGREE_OFFER
 
 
@@ -707,18 +753,21 @@ async def post_init(application: Application) -> None:
 
 
 buy_course_conversation = ConversationHandler(
-    entry_points=[CallbackQueryHandler(pay_chapter_callback_handle, pattern="^pay_chapter:")],
+    entry_points=[
+        CallbackQueryHandler(pay_chapter_callback_handle, pattern="^pay_chapter:"),
+        CallbackQueryHandler(confirm_multi_buy_handle, pattern="^confirm_buy_multiply$")
+    ],
     states={
         AGREE_OFFER: [CallbackQueryHandler(handle_offer_agree, pattern="^agree_offer:")],
         AGREE_PRIVACY: [CallbackQueryHandler(handle_privacy_agree, pattern="^agree_privacy:")],
-        AGREE_NEWSLETTER: [CallbackQueryHandler(handle_newsletter_agree,
-                                                pattern="^(agree_newsletter:|disagree_newsletter:)")],
+        AGREE_NEWSLETTER: [
+            CallbackQueryHandler(handle_newsletter_agree, pattern="^(agree_newsletter:|disagree_newsletter:)")
+        ],
         ASK_EMAIL: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_email_handle)],
     },
     fallbacks=[CallbackQueryHandler(cancel_payment_handle, pattern="^cancel$")],
     allow_reentry=True
 )
-
 
 def run():
     # Создание экземпляра RateLimiter
