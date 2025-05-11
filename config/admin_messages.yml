@@ -12,10 +12,7 @@ admin_payment_notification: |
   💳 <b>Метод оплаты:</b> {{ payment_method_type }}
   💸 <b>Чистый доход:</b> {{ income_amount }}₽
   
-  #id{{ user_id }} #n{{ order_code }}
-  {% for tag in formatted_chapters %}
-  #{{ tag }}
-  {% endfor %}
+  #id{{ user_id }} #n{{ order_code }}{% for tag in formatted_chapters %} #{{ tag }}{% endfor %}
 
 user_info_block: |
   <b>👤 Пользователь:</b>

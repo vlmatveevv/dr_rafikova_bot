@@ -39,7 +39,7 @@ ch_2:
     • Питание
   channel_id: -1002351564117
   channel_invite_link: 'https://t.me/+pZdebVu5-q9lNTVi'
-  price: 1290
+  price: 10
 
 ch_3:
   name: "ВТОРОЙ ТРИМЕСТ"
@@ -81,7 +81,7 @@ ch_4:
     • Ринит у беременных
   channel_id: -1002322120145
   channel_invite_link: 'https://t.me/+FBUFFOTbEo84NGRi'
-  price: 10
+  price: 1290
 
 ch_5:
   name: "РОДЫ"
@@ -122,7 +122,7 @@ ch_6:
     • Прием гинеколога
   channel_id: -1002451685806
   channel_invite_link: 'https://t.me/+yIaqwc4xPStkZmU6'
-  price: 11
+  price: 1290
 
 ch_7:
   name: "ПОЛНЫЙ КУРС (разделы с 1-6)"
