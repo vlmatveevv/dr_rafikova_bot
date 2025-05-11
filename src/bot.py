@@ -744,6 +744,8 @@ def run():
 
     application.add_handler(CallbackQueryHandler(buy_multiply_callback_handle, pattern="^buy_multiply$"))
 
+    application.add_handler(CallbackQueryHandler(toggle_multi_buy_chapter, pattern="^multi_buy_chapter:"))
+
     application.add_handler(CallbackQueryHandler(upd_payment_url_handle, pattern="^upd_payment_url:"))
 
     application.add_handler(CallbackQueryHandler(main_menu_callback_handle, pattern="^main_menu$"))
