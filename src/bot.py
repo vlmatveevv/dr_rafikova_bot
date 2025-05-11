@@ -490,13 +490,55 @@ async def buy_multiply_callback_handle(update: Update, context: CallbackContext)
         text = "Вы уже приобрели все доступные курсы."
         reply_markup = InlineKeyboardMarkup(my_keyboard.main_menu_button_markup())
     else:
-        keyboard = my_keyboard.ch_choose_button(not_bought_courses)
+        # Получаем уже выбранные курсы из context.user_data
+        selected = context.user_data.get("multi_buy_selected", [])
+
+        keyboard = my_keyboard.ch_choose_button(
+            available_courses=not_bought_courses,
+            mode='multi_buy',
+            selected=selected
+        )
         keyboard.extend(my_keyboard.main_menu_button_markup())
         reply_markup = InlineKeyboardMarkup(keyboard)
-        text = config.bot_msg['choose_chapter']
+        text = "Выберите главы, которые хотите купить. Нажмите ещё раз, чтобы снять выбор."
 
     await query.edit_message_text(
         text=text,
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.HTML
+    )
+
+
+async def toggle_multi_buy_chapter(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    await query.answer()
+
+    user_id = query.from_user.id
+    data = query.data  # Пример: "multi_buy_chapter:1"
+    chapter_num = data.split(":")[1]
+    chapter_key = f"ch_{chapter_num}"
+
+    selected = context.user_data.get("multi_buy_selected", [])
+
+    if chapter_key in selected:
+        selected.remove(chapter_key)
+    else:
+        selected.append(chapter_key)
+
+    context.user_data["multi_buy_selected"] = selected
+
+    not_bought_courses = pdb.get_not_bought_courses(user_id)
+
+    keyboard = my_keyboard.ch_choose_button(
+        available_courses=not_bought_courses,
+        mode='multi_buy',
+        selected=selected
+    )
+    keyboard.extend(my_keyboard.main_menu_button_markup())
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await query.edit_message_text(
+        text="Выберите главы, которые хотите купить. Нажмите ещё раз, чтобы снять выбор.",
         reply_markup=reply_markup,
         parse_mode=ParseMode.HTML
     )
