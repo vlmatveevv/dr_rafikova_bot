@@ -479,6 +479,29 @@ async def cancel_payment_handle(update: Update, context: CallbackContext) -> int
     return ConversationHandler.END
 
 
+async def buy_multiply_callback_handle(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    await query.answer()
+
+    user_id = query.from_user.id
+    not_bought_courses = pdb.get_not_bought_courses(user_id)
+
+    if not not_bought_courses:
+        text = "Вы уже приобрели все доступные курсы."
+        reply_markup = InlineKeyboardMarkup(my_keyboard.main_menu_button_markup())
+    else:
+        keyboard = my_keyboard.ch_choose_button(not_bought_courses)
+        keyboard.extend(my_keyboard.main_menu_button_markup())
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        text = config.bot_msg['choose_chapter']
+
+    await query.edit_message_text(
+        text=text,
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.HTML
+    )
+
+
 async def upd_payment_url_handle(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
     await query.answer()
@@ -676,6 +699,9 @@ def run():
 
     application.add_handler(CallbackQueryHandler(buy_courses_callback_handle, pattern="^buy_courses$"))
     application.add_handler(CallbackQueryHandler(buy_chapter_callback_handle, pattern="^buy_chapter:"))
+
+    application.add_handler(CallbackQueryHandler(buy_multiply_callback_handle, pattern="^buy_multiply$"))
+
     application.add_handler(CallbackQueryHandler(upd_payment_url_handle, pattern="^upd_payment_url:"))
 
     application.add_handler(CallbackQueryHandler(main_menu_callback_handle, pattern="^main_menu$"))

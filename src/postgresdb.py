@@ -277,6 +277,39 @@ class Database:
     #         print(f"Ошибка при проверке оплаты курса: {e}")
     #         return False
 
+    def get_not_bought_courses(self, user_id: int) -> list:
+        """
+        Возвращает список курсов, которые пользователь еще не купил.
+
+        :param user_id: Telegram user ID
+        :return: список course_chapter, которые доступны в config.courses, но не куплены
+        """
+        try:
+            with self.conn.cursor() as cursor:
+                # Получаем уже купленные курсы
+                query = """
+                    SELECT DISTINCT unnest(course_chapter) AS chapter FROM (
+                        SELECT o.course_chapter
+                        FROM orders o
+                        JOIN payments p ON o.order_id = p.order_id
+                        WHERE o.user_id = %s
+                        UNION ALL
+                        SELECT ARRAY[ma.course_chapter]
+                        FROM manual_access ma
+                        WHERE ma.user_id = %s
+                    ) AS combined
+                """
+                cursor.execute(query, (user_id, user_id))
+                bought_courses = {row[0] for row in cursor.fetchall()}
+
+                # Вычитаем из всех возможных курсов
+                all_courses = set(config.courses.keys())
+                not_bought = list(all_courses - bought_courses)
+                return not_bought
+        except Exception as e:
+            print(f"❌ Ошибка при получении некупленных курсов: {e}")
+            return []
+
     def has_paid_course(self, user_id: int, course_chapter: str) -> bool:
         """
         Проверяет, оплатил ли пользователь указанный курс.

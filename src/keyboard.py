@@ -13,7 +13,7 @@ def main_menu_button_markup():
 def buy_multiply_button_markup():
     keyboard = [[InlineKeyboardButton(
         text=config.bot_btn['buy_multiply'],
-        callback_data='buy_multiply'
+        callback_data=config.bot_btn['buy_multiply']
     )]]
     return keyboard
 
