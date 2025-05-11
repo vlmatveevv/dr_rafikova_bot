@@ -586,6 +586,7 @@ async def toggle_multi_buy_chapter(update: Update, context: CallbackContext) -> 
     context.user_data["multi_buy_selected"] = selected
 
     not_bought_courses = pdb.get_not_bought_courses(user_id)
+    not_bought_courses = [ch for ch in not_bought_courses if ch != "ch_7"]
 
     keyboard = my_keyboard.ch_choose_button(
         available_courses=not_bought_courses,
