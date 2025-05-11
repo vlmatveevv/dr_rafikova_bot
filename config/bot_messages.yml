@@ -15,13 +15,16 @@ buy_chapter_info: |
   Содержание раздела:</b>
   {description}
   <b>Стоимость:</b> {price} ₽
-confirm_purchase: |
+confirm_purchase_header: |
   <b>Подтверждение</b>
 
   Ваш эл. адрес: {email}
 
-  Вы покупаете раздел курса <b>{name}</b>
-  <b>Сумма к оплате:</b> {price} ₽
+confirm_purchase_course_line: |
+  • {name} — <b>{price} ₽</b>
+
+confirm_purchase_footer: |
+  💰 <b>Общая сумма к оплате: {total} ₽</b>
 support: |
   <b>💬 Нужна помощь?</b>
   

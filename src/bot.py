@@ -474,27 +474,24 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
     except Exception as e:
         logger.error(f"Ошибка удаления сообщения: {e}")
 
-    text_lines = []
-    total_price = 0
+    text_lines = [config.bot_msg['confirm_purchase_header'].format(email=email)]
+    # Заголовок
 
+    # Каждая строка курса
+    total_price = 0
     for course_key in selected_courses:
         course = config.courses[course_key]
-        num = course_key.split('_')[1]
-        price = course['price']
-        total_price += price
-
-        course_text = config.bot_msg['confirm_purchase'].format(
-            email=email,
+        line = config.bot_msg['confirm_purchase_course_line'].format(
             name=course['name'] + course['emoji'],
-            num=num,
-            price=price
+            price=course['price']
         )
-        text_lines.append(course_text)
+        text_lines.append(line)
+        total_price += course['price']
 
-    # Добавляем итог
-    text_lines.append(f"<b>💰 Общая сумма к оплате: {total_price} ₽</b>")
+    # Итог
+    text_lines.append(config.bot_msg['confirm_purchase_footer'].format(total=total_price))
 
-    text = "\n\n".join(text_lines)
+    text = "\n".join(text_lines)
 
     # Создаём платёж (убедись, что функция поддерживает многокурсовую оплату)
     payment_url = payment.create_payment_robokassa(
@@ -522,6 +519,7 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
 
     context.user_data.clear()
     return ConversationHandler.END
+
 
 # Отмена
 async def cancel_payment_handle(update: Update, context: CallbackContext) -> int:
@@ -709,7 +707,8 @@ async def grant_manual_access_handle(update: Update, context: CallbackContext):
     # Добавим доступ в manual_access
     try:
         pdb.grant_manual_access(user_id=user_id, course_chapter=course_key, granted_by=admin_id)
-        await query.edit_message_text(f"✅ Доступ пользователю {user_id} к курсу {name} успешно выдан. Теперь ему нужно заново перейти в канал.")
+        await query.edit_message_text(
+            f"✅ Доступ пользователю {user_id} к курсу {name} успешно выдан. Теперь ему нужно заново перейти в канал.")
     except Exception as e:
         logger.error(f"❌ Ошибка выдачи доступа: {e}")
         await query.edit_message_text("❌ Ошибка при попытке выдать доступ.")
@@ -781,6 +780,7 @@ buy_course_conversation = ConversationHandler(
     fallbacks=[CallbackQueryHandler(cancel_payment_handle, pattern="^cancel$")],
     allow_reentry=True
 )
+
 
 def run():
     # Создание экземпляра RateLimiter
