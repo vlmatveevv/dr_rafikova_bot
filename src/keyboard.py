@@ -12,7 +12,7 @@ def main_menu_button_markup():
 
 def buy_multiply_button_markup():
     keyboard = [[InlineKeyboardButton(
-        text=config.bot_btn['buy_multiply'],
+        text=config.bot_btn['buy_multiply']['main'],
         callback_data='buy_multiply'
     )]]
     return keyboard
@@ -59,6 +59,7 @@ def ch_choose_button(available_courses=None, mode='buy', selected=None):
 
     return keyboard
 
+
 def main_menu_items_button_markup():
     main_menu = config.bot_btn['main_menu']
 
@@ -66,6 +67,18 @@ def main_menu_items_button_markup():
     buttons = [
         [InlineKeyboardButton(text=label, callback_data=key)]
         for key, label in main_menu.items()
+    ]
+
+    return InlineKeyboardMarkup(buttons)
+
+
+def buy_multiply_menu_items_button_markup():
+    buy_multiply_menu = config.bot_btn['buy_multiply']['menu']
+
+    # Каждая кнопка — это (название, callback_data)
+    buttons = [
+        [InlineKeyboardButton(text=label, callback_data=key)]
+        for key, label in buy_multiply_menu.items()
     ]
 
     return InlineKeyboardMarkup(buttons)

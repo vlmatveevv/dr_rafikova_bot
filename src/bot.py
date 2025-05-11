@@ -499,6 +499,7 @@ async def buy_multiply_callback_handle(update: Update, context: CallbackContext)
             selected=selected
         )
         keyboard.extend(my_keyboard.main_menu_button_markup())
+        keyboard.extend(my_keyboard.buy_multiply_menu_items_button_markup())
         reply_markup = InlineKeyboardMarkup(keyboard)
         text = "Выберите главы, которые хотите купить. Нажмите ещё раз, чтобы снять выбор."
 
@@ -535,10 +536,11 @@ async def toggle_multi_buy_chapter(update: Update, context: CallbackContext) -> 
         selected=selected
     )
     keyboard.extend(my_keyboard.main_menu_button_markup())
+    keyboard.extend(my_keyboard.buy_multiply_menu_items_button_markup())
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await query.edit_message_text(
-        text="Выберите главы, которые хотите купить. Нажмите ещё раз, чтобы снять выбор.",
+        text="Выберите разделы, которые хотите купить. Нажмите ещё раз, чтобы снять выбор.",
         reply_markup=reply_markup,
         parse_mode=ParseMode.HTML
     )
