@@ -834,7 +834,7 @@ def run():
 
     application.add_handler(buy_course_conversation)
     application.add_handler(ChatJoinRequestHandler(handle_join_request))
-    # application.add_error_handler(error_handler)
+    application.add_error_handler(error_handler)
 
     logger.addHandler(logging.StreamHandler())
 
