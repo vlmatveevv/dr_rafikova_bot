@@ -264,7 +264,10 @@ async def buy_chapter_callback_handle(update: Update, context: CallbackContext) 
     user_id = query.from_user.id
 
     num_of_chapter = query.data.split(':')[1]
-    menu_path = query.data.split(':')[2]
+    try:
+        menu_path = query.data.split(':')[2]
+    except Exception:
+        menu_path = 'default'
 
     chapter_mask = f'ch_{num_of_chapter}'
     course = config.courses.get(chapter_mask)
