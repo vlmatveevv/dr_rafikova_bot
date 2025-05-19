@@ -35,7 +35,7 @@ def buy_multiply_button_markup():
 #     return keyboard
 
 
-def ch_choose_button(available_courses=None, mode='buy', selected=None, menu_path='default'):
+def ch_choose_button(available_courses=None, mode='buy', selected=None, menu_path='def'):
     chapter_order = ['ch_7', 'ch_1', 'ch_2', 'ch_3', 'ch_4', 'ch_5', 'ch_6']
     keyboard = []
 
