@@ -159,7 +159,7 @@ async def my_courses_command(update: Update, context: CallbackContext) -> None:
     for course_key in available_courses:
         course = config.courses.get(course_key)
         if course:
-            keyboard = my_keyboard.ch_choose_button(available_courses, menu_path)
+            keyboard = my_keyboard.ch_choose_button(available_courses=available_courses, menu_path=menu_path)
 
     keyboard.extend(my_keyboard.main_menu_button_markup())  # <-- исправлено
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -175,8 +175,7 @@ async def my_courses_callback_handle(update: Update, context: CallbackContext) -
 
 
 async def all_courses_command(update: Update, context: CallbackContext) -> None:
-    menu_path = 'all_courses'
-    keyboard = my_keyboard.ch_choose_button(menu_path)
+    keyboard = my_keyboard.ch_choose_button(menu_path='all_courses')
 
     keyboard.extend(my_keyboard.buy_multiply_button_markup())
     keyboard.extend(my_keyboard.main_menu_button_markup())
@@ -235,8 +234,7 @@ async def main_menu_callback_handle(update: Update, context: CallbackContext) ->
 
 
 async def buy_courses_command(update: Update, context: CallbackContext) -> None:
-    menu_path = 'default'
-    keyboard = my_keyboard.ch_choose_button(menu_path)
+    keyboard = my_keyboard.ch_choose_button(menu_path = 'default')
 
     keyboard.extend(my_keyboard.buy_multiply_button_markup())
     reply_markup = InlineKeyboardMarkup(keyboard)
