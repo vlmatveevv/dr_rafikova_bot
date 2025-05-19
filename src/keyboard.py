@@ -35,7 +35,7 @@ def buy_multiply_button_markup():
 #     return keyboard
 
 
-def ch_choose_button(available_courses=None, mode='buy', selected=None):
+def ch_choose_button(available_courses=None, mode='buy', selected=None, menu_path='default'):
     chapter_order = ['ch_7', 'ch_1', 'ch_2', 'ch_3', 'ch_4', 'ch_5', 'ch_6']
     keyboard = []
 
@@ -53,7 +53,7 @@ def ch_choose_button(available_courses=None, mode='buy', selected=None):
 
             button = InlineKeyboardButton(
                 text=name,
-                callback_data=f'{mode}_chapter:{num_of_chapter}'  # например: multi_buy_chapter:1
+                callback_data=f'{mode}_chapter:{num_of_chapter}:{menu_path}'  # например: multi_buy_chapter:1
             )
             keyboard.append([button])
 

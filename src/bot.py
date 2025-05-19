@@ -145,6 +145,7 @@ async def my_courses_command(update: Update, context: CallbackContext) -> None:
 
     # Получаем все доступные курсы
     available_courses = pdb.get_all_user_courses(user_id)
+    menu_path = 'my_courses'
 
     if not available_courses:
         text = "У вас пока нет доступных курсов."
@@ -158,7 +159,7 @@ async def my_courses_command(update: Update, context: CallbackContext) -> None:
     for course_key in available_courses:
         course = config.courses.get(course_key)
         if course:
-            keyboard = my_keyboard.ch_choose_button(available_courses)
+            keyboard = my_keyboard.ch_choose_button(available_courses, menu_path)
 
     keyboard.extend(my_keyboard.main_menu_button_markup())  # <-- исправлено
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -174,7 +175,8 @@ async def my_courses_callback_handle(update: Update, context: CallbackContext) -
 
 
 async def all_courses_command(update: Update, context: CallbackContext) -> None:
-    keyboard = my_keyboard.ch_choose_button()
+    menu_path = 'all_courses'
+    keyboard = my_keyboard.ch_choose_button(menu_path)
 
     keyboard.extend(my_keyboard.buy_multiply_button_markup())
     keyboard.extend(my_keyboard.main_menu_button_markup())
@@ -232,18 +234,29 @@ async def main_menu_callback_handle(update: Update, context: CallbackContext) ->
     )
 
 
+async def buy_courses_command(update: Update, context: CallbackContext) -> None:
+    menu_path = 'default'
+    keyboard = my_keyboard.ch_choose_button(menu_path)
+
+    keyboard.extend(my_keyboard.buy_multiply_button_markup())
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    text = config.bot_msg['choose_chapter']
+    await send_or_edit_message(update, context, text, reply_markup)
+
+
 # Покупка курсов (список)
 async def buy_courses_callback_handle(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
     await query.answer()
-    keyboard = my_keyboard.ch_choose_button()
-    keyboard.extend(my_keyboard.buy_multiply_button_markup())
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text(
-        text=config.bot_msg['choose_chapter'],
-        reply_markup=reply_markup,
-        parse_mode=ParseMode.HTML
-    )
+    await buy_courses_command(update, context)
+    # keyboard = my_keyboard.ch_choose_button()
+    # keyboard.extend(my_keyboard.buy_multiply_button_markup())
+    # reply_markup = InlineKeyboardMarkup(keyboard)
+    # await query.edit_message_text(
+    #     text=config.bot_msg['choose_chapter'],
+    #     reply_markup=reply_markup,
+    #     parse_mode=ParseMode.HTML
+    # )
 
 
 # Детали конкретного курса
@@ -253,6 +266,7 @@ async def buy_chapter_callback_handle(update: Update, context: CallbackContext) 
     user_id = query.from_user.id
 
     num_of_chapter = query.data.split(':')[1]
+    menu_path = query.data.split(':')[2]
 
     chapter_mask = f'ch_{num_of_chapter}'
     course = config.courses.get(chapter_mask)
@@ -279,7 +293,7 @@ async def buy_chapter_callback_handle(update: Update, context: CallbackContext) 
         ])
 
     keyboard.append([
-        InlineKeyboardButton(config.bot_btn['go_back'], callback_data='buy_courses')
+        InlineKeyboardButton(config.bot_btn['go_back'], callback_data=f'go_back:{menu_path}')
     ])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -723,6 +737,19 @@ async def deny_manual_access(update: Update, context: CallbackContext):
     await query.edit_message_text(f"⛔️ Вы отказали в доступе пользователю {user_id_str} к курсу {course_key}.")
 
 
+async def go_back_callback_handle(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    await query.answer()
+
+    menu_path = query.data.split(':')[1]
+    if menu_path == 'all_courses':
+        await all_courses_command(update, context)
+    elif menu_path == 'my_courses':
+        await my_courses_command(update, context)
+    else:
+        await buy_courses_command(update, context)
+
+
 async def error_handler(update: object, context: CallbackContext) -> None:
     logger.error("Exception while handling an update:", exc_info=context.error)
 
@@ -816,6 +843,8 @@ def run():
     application.add_handler(CallbackQueryHandler(buy_multiply_callback_handle, pattern="^buy_multiply$"))
 
     application.add_handler(CallbackQueryHandler(toggle_multi_buy_chapter, pattern="^multi_buy_chapter:"))
+
+    application.add_handler(CallbackQueryHandler(go_back_callback_handle, pattern="^go_back:"))
 
     application.add_handler(CallbackQueryHandler(clear_selected_multi_buy_callback_handle,
                                                  pattern="^clear_buy_multiply$"))
