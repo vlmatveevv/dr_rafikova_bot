@@ -115,7 +115,7 @@ def create_payment_robokassa(price, email, num_of_chapter, order_code, order_id,
         })
 
     # Описание для платёжной ссылки (не чек)
-    description = f"Доступ к курсу."
+    description = f"Доступ к курсу. #n{order_code}"
 
     receipt = {"items": items}
 
