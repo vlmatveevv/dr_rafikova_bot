@@ -19,6 +19,7 @@ async def create_payment(price, user_id, email, num_of_chapter, order_id, order_
     formatted_chapter = f'ch_{num_of_chapter}'
     course = config.courses.get(formatted_chapter)
     name = course['name']
+    short_name_for_receipt = course['short_name_for_receipt']
     payment = Payment.create({
         "amount": {
             "value": str(price),  # Преобразуем цену в строку, как ожидает API
@@ -30,7 +31,7 @@ async def create_payment(price, user_id, email, num_of_chapter, order_id, order_
         },
         "capture": True,
         "test": True,
-        "description": f"Доступ к разделу курса {name}. Заказ #n{order_code}",
+        "description": f"Доступ к курсу. Заказ #n{order_code}",
         "metadata": {
             "type": "self",
             "user_id": user_id,
@@ -43,7 +44,7 @@ async def create_payment(price, user_id, email, num_of_chapter, order_id, order_
             },
             "items": [
                 {
-                    "description": f"Доступ к разделу курса {name}. Заказ #n{order_code}",
+                    "description": f"Доступ к разделу курса {short_name_for_receipt}. Заказ #n{order_code}",
                     "quantity": "1",
                     "amount": {
                         "value": str(price),  # Цена также должна быть строкой
