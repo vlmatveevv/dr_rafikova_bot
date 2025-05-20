@@ -44,7 +44,7 @@ async def create_payment(price, user_id, email, num_of_chapter, order_id, order_
             },
             "items": [
                 {
-                    "description": f"Доступ к разделу курса {short_name_for_receipt}. Заказ #n{order_code}",
+                    "description": f"{short_name_for_receipt}",
                     "quantity": "1",
                     "amount": {
                         "value": str(price),  # Цена также должна быть строкой
@@ -106,7 +106,7 @@ def create_payment_robokassa(price, email, num_of_chapter, order_code, order_id,
             continue
 
         items.append({
-            "Name": f"Доступ к разделу курса {course['name']}",
+            "Name": f"{course['short_name_for_receipt']}",
             "Quantity": 1,
             "Sum": course['price'],
             "PaymentMethod": "full_prepayment",
@@ -115,7 +115,7 @@ def create_payment_robokassa(price, email, num_of_chapter, order_code, order_id,
         })
 
     # Описание для платёжной ссылки (не чек)
-    description = f"Доступ к обучающим разделам. Заказ №{order_code}"
+    description = f"Доступ к курсу."
 
     receipt = {"items": items}
 
