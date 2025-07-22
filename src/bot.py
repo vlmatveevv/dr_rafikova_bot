@@ -509,7 +509,14 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
     text = "\n".join(text_lines)
 
     # Создаём платёж (убедись, что функция поддерживает многокурсовую оплату)
-    payment_url = payment.create_payment_robokassa(
+    # payment_url = payment.create_payment_robokassa(
+    #     price=total_price,
+    #     email=email,
+    #     num_of_chapter=",".join([key.split('_')[1] for key in selected_courses]),
+    #     order_code=order_code,
+    #     order_id=order_id,
+    #     user_id=user_id
+    payment_url = payment.create_recurring_payment_link(
         price=total_price,
         email=email,
         num_of_chapter=",".join([key.split('_')[1] for key in selected_courses]),
