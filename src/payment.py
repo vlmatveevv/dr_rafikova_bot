@@ -141,7 +141,7 @@ def create_recurring_payment_link(**kwargs) -> str:
     Создание ссылки на первый рекуррентный платёж.
     """
     # 1. Явно проставим recurring=True в URL
-    kwargs['recurring'] = True
+    kwargs['Recurring'] = True
 
     # 2. Добавим Recurring="true" в подпись (через additional_params)
     if 'additional_params' not in kwargs:
