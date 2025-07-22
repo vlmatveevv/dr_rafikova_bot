@@ -128,29 +128,10 @@ def create_payment_robokassa(price, email, num_of_chapter, order_code, order_id,
         inv_id=order_code,
         out_sum=price,
         user_id=user_id,
-        # recurring=True,
+        recurring=True,
         formatted_chapter=",".join(formatted_chapters),
         order_id=order_id
     )
-
-    return response.url
-
-
-def create_recurring_payment_link(**kwargs) -> str:
-    """
-    Создание ссылки на первый рекуррентный платёж.
-    """
-    # 1. Явно проставим recurring=True в URL
-    kwargs['Recurring'] = True
-
-    # 2. Добавим Recurring="true" в подпись (через additional_params)
-    if 'additional_params' not in kwargs:
-        kwargs['additional_params'] = {}
-
-    kwargs['additional_params']['Recurring'] = 'true'  # ← попадёт в Signature
-
-    # 3. Создаём ссылку
-    response = robokassa.generate_open_payment_link(**kwargs)
 
     return response.url
 
