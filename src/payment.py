@@ -128,7 +128,7 @@ def create_payment_robokassa(price, email, num_of_chapter, order_code, order_id,
         inv_id=order_code,
         out_sum=price,
         user_id=user_id,
-        recurring=True,
+        # recurring=True,
         formatted_chapter=",".join(formatted_chapters),
         order_id=order_id
     )
