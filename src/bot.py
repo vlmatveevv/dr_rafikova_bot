@@ -127,7 +127,7 @@ async def register(update: Update, context: CallbackContext) -> int:
     if not await user_exists_pdb(user_id):
         pdb.add_user(user_id, username, first_name, last_name)
 
-    keyboard = [[InlineKeyboardButton(config.bot_btn['buy_courses'], callback_data='pay_chapter:ch_9')]]
+    keyboard = [[InlineKeyboardButton(config.bot_btn['buy_courses'], callback_data='pay_chapter:ch_8')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await context.bot.send_message(
