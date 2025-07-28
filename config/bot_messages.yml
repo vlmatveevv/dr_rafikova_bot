@@ -19,7 +19,7 @@ confirm_purchase_header: |
 
   Ваш эл. адрес: {email}
   
-  Вы оформляете подписку на закрытый Telegram-канал, включающую доступ к курсу:
+  Вы оформляете подписку на закрытый Telegram-канал "Доктор Рафикова":
 
 confirm_purchase_course_line: |
   • {name} — <b>{price} ₽</b>
