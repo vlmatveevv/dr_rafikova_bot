@@ -127,7 +127,7 @@ async def register(update: Update, context: CallbackContext) -> int:
     if not await user_exists_pdb(user_id):
         pdb.add_user(user_id, username, first_name, last_name)
 
-    keyboard = [[InlineKeyboardButton(config.bot_btn['buy_courses'], callback_data='buy_courses')]]
+    keyboard = [[InlineKeyboardButton(config.bot_btn['buy_courses'], callback_data='pay_chapter:ch_9')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await context.bot.send_message(
@@ -234,7 +234,7 @@ async def main_menu_callback_handle(update: Update, context: CallbackContext) ->
 
 
 async def buy_courses_command(update: Update, context: CallbackContext) -> None:
-    keyboard = my_keyboard.ch_choose_button(menu_path = 'default')
+    keyboard = my_keyboard.ch_choose_button(menu_path='default')
 
     keyboard.extend(my_keyboard.buy_multiply_button_markup())
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -247,14 +247,6 @@ async def buy_courses_callback_handle(update: Update, context: CallbackContext) 
     query = update.callback_query
     await query.answer()
     await buy_courses_command(update, context)
-    # keyboard = my_keyboard.ch_choose_button()
-    # keyboard.extend(my_keyboard.buy_multiply_button_markup())
-    # reply_markup = InlineKeyboardMarkup(keyboard)
-    # await query.edit_message_text(
-    #     text=config.bot_msg['choose_chapter'],
-    #     reply_markup=reply_markup,
-    #     parse_mode=ParseMode.HTML
-    # )
 
 
 # Детали конкретного курса
@@ -832,8 +824,8 @@ def run():
     )
 
     application.add_handler(CommandHandler('start', register))
-    application.add_handler(CommandHandler('my_courses', my_courses_command))
-    application.add_handler(CommandHandler('all_courses', all_courses_command))
+    # application.add_handler(CommandHandler('my_courses', my_courses_command))
+    # application.add_handler(CommandHandler('all_courses', all_courses_command))
     application.add_handler(CommandHandler('documents', documents_command))
     application.add_handler(CommandHandler('support', support_command))
 
