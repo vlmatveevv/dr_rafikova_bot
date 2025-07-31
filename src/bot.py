@@ -223,6 +223,37 @@ async def support_callback_handle(update: Update, context: CallbackContext) -> N
     await support_command(update, context)
 
 
+async def cancel_sub_command(update: Update, context: CallbackContext) -> None:
+    text = config.bot_msg['sub']['cancel']
+    keyboard = [
+        [InlineKeyboardButton(config.bot_btn['sub']['cancel'], callback_data="cancel_sub_confirm")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await send_or_edit_message(update, context, text, reply_markup)
+
+
+async def cancel_sub_confirm_callback(update: Update, context: CallbackContext) -> None:
+    text = config.bot_msg['sub']['cancel_confirm']
+    keyboard = [
+        [
+            InlineKeyboardButton(config.bot_btn['sub']['confirm_cancel'], callback_data="cancel_sub_final"),
+            InlineKeyboardButton(config.bot_btn['sub']['keep'], callback_data="cancel_sub_keep")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await send_or_edit_message(update, context, text, reply_markup)
+
+
+async def cancel_sub_final_callback(update: Update, context: CallbackContext) -> None:
+    text = config.bot_msg['sub']['canceled']
+    await send_or_edit_message(update, context, text)
+
+
+async def cancel_sub_keep_callback(update: Update, context: CallbackContext) -> None:
+    text = config.bot_msg['sub']['cancel_keep']
+    await send_or_edit_message(update, context, text)
+
+
 async def main_menu_callback_handle(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
     await query.answer()
@@ -828,6 +859,7 @@ def run():
     # application.add_handler(CommandHandler('all_courses', all_courses_command))
     application.add_handler(CommandHandler('documents', documents_command))
     application.add_handler(CommandHandler('support', support_command))
+    application.add_handler(CommandHandler('cancel_sub', cancel_sub_command))
 
     application.add_handler(CallbackQueryHandler(buy_courses_callback_handle, pattern="^buy_courses$"))
     application.add_handler(CallbackQueryHandler(buy_chapter_callback_handle, pattern="^buy_chapter:"))
@@ -852,6 +884,10 @@ def run():
 
     application.add_handler(CallbackQueryHandler(grant_manual_access_handle, pattern="^grant_access:"))
     application.add_handler(CallbackQueryHandler(deny_manual_access, pattern="^deny_access:"))
+
+    application.add_handler(CallbackQueryHandler(cancel_sub_confirm_callback, pattern="^cancel_sub_confirm$"))
+    application.add_handler(CallbackQueryHandler(cancel_sub_final_callback, pattern="^cancel_sub_final$"))
+    application.add_handler(CallbackQueryHandler(cancel_sub_keep_callback, pattern="^cancel_sub_keep$"))
 
     application.add_handler(buy_course_conversation)
     application.add_handler(ChatJoinRequestHandler(handle_join_request))
