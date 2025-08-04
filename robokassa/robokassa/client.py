@@ -1,18 +1,18 @@
 from datetime import datetime
 from typing import List, Optional, Union
 
-from robokassa.connection import AUTH_BASE_URL, SERVICES_BASE_URL, Http
-from robokassa.exceptions import (
+from .connection import AUTH_BASE_URL, SERVICES_BASE_URL, Http
+from .exceptions import (
     IncorrectUrlMethodError,
     RobokassaInterfaceError,
     UnusedParameterError,
     UnusedStrictUrlParameterError,
 )
-from robokassa.hash import Hash, HashAlgorithm
-from robokassa.merchant import OperationStateChecker
-from robokassa.payment import LinkGenerator
-from robokassa.signature import SignatureChecker
-from robokassa.types import (
+from .hash import Hash, HashAlgorithm
+from .merchant import OperationStateChecker
+from .payment import LinkGenerator
+from .signature import SignatureChecker
+from .types import (
     Culture,
     HTTPMethod,
     InvoiceType,

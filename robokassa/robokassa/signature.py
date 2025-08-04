@@ -1,7 +1,7 @@
 from typing import Any, Optional, Union
 
-from robokassa.hash import Hash
-from robokassa.types import Signature
+from .hash import Hash
+from .types import Signature
 
 
 class SignatureChecker:

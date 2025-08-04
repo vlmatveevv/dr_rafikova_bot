@@ -2,7 +2,7 @@ import base64
 import hmac
 import json
 
-from robokassa.types import Hash
+from .types import Hash
 
 
 class JWT:

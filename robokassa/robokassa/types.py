@@ -6,8 +6,8 @@ from hmac import compare_digest
 from typing import Any, Dict, List, Optional, Union
 from urllib.parse import quote
 
-from robokassa.exceptions import UnusedStrictUrlParameterError
-from robokassa.hash import Hash
+from .exceptions import UnusedStrictUrlParameterError
+from .hash import Hash
 
 
 @dataclass

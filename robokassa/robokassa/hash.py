@@ -2,7 +2,7 @@ import _hashlib
 import hashlib
 from enum import Enum
 
-from robokassa.exceptions import UnresolvedAlgorithmTypeError
+from .exceptions import UnresolvedAlgorithmTypeError
 
 
 class HashAlgorithm(Enum):

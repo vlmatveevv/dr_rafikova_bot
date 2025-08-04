@@ -2,11 +2,11 @@ from collections.abc import Sequence
 from typing import Any, Dict, Optional, Union
 from urllib.parse import quote, urlencode
 
-from robokassa.connection import Http
-from robokassa.exceptions import RobokassaInterfaceError
-from robokassa.hash import Hash
-from robokassa.jwt import JWT
-from robokassa.types import RobokassaParams, RobokassaResponse, Signature
+from .connection import Http
+from .exceptions import RobokassaInterfaceError
+from .hash import Hash
+from .jwt import JWT
+from .types import RobokassaParams, RobokassaResponse, Signature
 
 
 class LinkGenerator:

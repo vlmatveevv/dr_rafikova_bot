@@ -2,10 +2,10 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 from typing import Optional
 
-from robokassa.connection import Http
-from robokassa.exceptions import RobokassaParsingError, RobokassaRequestError
-from robokassa.hash import Hash
-from robokassa.types import PaymentDetails, PaymentState, Signature
+from .connection import Http
+from .exceptions import RobokassaParsingError, RobokassaRequestError
+from .hash import Hash
+from .types import PaymentDetails, PaymentState, Signature
 
 
 class OperationStateChecker:
