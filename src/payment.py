@@ -2,6 +2,18 @@ import config
 from yookassa import Configuration, Payment
 from robokassa.robokassa import HashAlgorithm, Robokassa
 from robokassa.robokassa.types import InvoiceType
+import logging
+
+# Настройка формата и уровня логгирования
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+# Создание логгера
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+# Получите логгер для модуля 'httpx'
+logger_for_httpx = logging.getLogger('httpx')
+# Установите уровень логирования на WARNING, чтобы скрыть INFO и DEBUG сообщения
+logger_for_httpx.setLevel(logging.WARNING)
+
 
 robokassa = Robokassa(
     merchant_login=config.config_env['MERCHANT_LOGIN_ROBOKASSA'],
@@ -132,5 +144,5 @@ def create_payment_robokassa(price, email, num_of_chapter, order_code, order_id,
         formatted_chapter=",".join(formatted_chapters),
         order_id=order_id
     )
-
+    logger.info(response)
     return response.url
