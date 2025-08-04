@@ -1,4 +1,4 @@
-from robokassa.client import Robokassa
-from robokassa.hash import HashAlgorithm
+from client import Robokassa
+from hash import HashAlgorithm
 
 __all__ = ["Robokassa", "HashAlgorithm"]
