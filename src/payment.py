@@ -190,9 +190,9 @@ async def charge_monthly_subscription():
         result = await create_recurring_payment_robokassa(
             price=subscription_price,
             email=user_email,
-            num_of_chapter='ch_8',
-            order_code=34534534,
-            order_id=9898,
+            num_of_chapter='8',
+            order_code=34534535,
+            order_id=9899,
             user_id=146679674,
             previous_inv_id=first_payment_inv_id  # ← ID первого платежа
         )
