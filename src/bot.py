@@ -232,6 +232,11 @@ async def cancel_sub_command(update: Update, context: CallbackContext) -> None:
     await send_or_edit_message(update, context, text, reply_markup)
 
 
+async def zxc_command(update: Update, context: CallbackContext) -> None:
+    text = 'hello'
+    await send_or_edit_message(update, context, text)
+
+
 async def cancel_sub_confirm_callback(update: Update, context: CallbackContext) -> None:
     text = config.bot_msg['sub']['cancel_confirm']
     keyboard = [
@@ -860,6 +865,7 @@ def run():
     application.add_handler(CommandHandler('documents', documents_command))
     application.add_handler(CommandHandler('support', support_command))
     application.add_handler(CommandHandler('cancel_sub', cancel_sub_command))
+    application.add_handler(CommandHandler('zxc', zxc_command))
 
     application.add_handler(CallbackQueryHandler(buy_courses_callback_handle, pattern="^buy_courses$"))
     application.add_handler(CallbackQueryHandler(buy_chapter_callback_handle, pattern="^buy_chapter:"))

@@ -1,7 +1,7 @@
 import config
 from yookassa import Configuration, Payment
-from robokassa import HashAlgorithm, Robokassa
-from robokassa.types import InvoiceType
+from robokassa.robokassa import HashAlgorithm, Robokassa
+from robokassa.robokassa.types import InvoiceType
 
 robokassa = Robokassa(
     merchant_login=config.config_env['MERCHANT_LOGIN_ROBOKASSA'],
@@ -134,40 +134,3 @@ def create_payment_robokassa(price, email, num_of_chapter, order_code, order_id,
     )
 
     return response.url
-
-
-# async def create_payment_robokassa(price, email, num_of_chapter, order_code, order_id, user_id):
-#     formatted_chapter = f'ch_{num_of_chapter}'
-#     course = config.courses.get(formatted_chapter)
-#     name = course['name']
-#     description = f"Доступ к разделу курса {name}. Заказ #n{order_code}"
-#
-#     receipt = {
-#         "sno": "usn_income",
-#         "items": [
-#             {
-#                 "name": f"Доступ к разделу курса {name}",
-#                 "quantity": 1,
-#                 "sum": price,
-#                 "payment_method": "full_prepayment",
-#                 "payment_object": "service",
-#                 "tax": "none"
-#             }
-#         ],
-#         "email": email
-#     }
-#
-#     response = await robokassa.generate_protected_payment_link(
-#         merchant_comments="no comment",
-#         description=description,
-#         invoice_type=InvoiceType.ONE_TIME,
-#         email=email,
-#         inv_id=order_code,
-#         out_sum=price,
-#         receipt=receipt,
-#         user_id=user_id,
-#         formatted_chapter=formatted_chapter,
-#         order_id=order_id
-#     )
-#
-#     return response.url
