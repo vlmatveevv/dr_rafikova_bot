@@ -233,8 +233,7 @@ async def cancel_sub_command(update: Update, context: CallbackContext) -> None:
 
 
 async def zxc_command(update: Update, context: CallbackContext) -> None:
-    text = 'hello'
-    await send_or_edit_message(update, context, text)
+    await payment.charge_monthly_subscription()
 
 
 async def cancel_sub_confirm_callback(update: Update, context: CallbackContext) -> None:

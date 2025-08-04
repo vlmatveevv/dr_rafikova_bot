@@ -71,40 +71,6 @@ async def create_payment(price, user_id, email, num_of_chapter, order_id, order_
     return payment.confirmation.confirmation_url
 
 
-# def create_payment_robokassa(price, email, num_of_chapter, order_code, order_id, user_id):
-#     formatted_chapter = f'ch_{num_of_chapter}'
-#     course = config.courses.get(formatted_chapter)
-#     name = course['name']
-#     description = f"Доступ к разделу курса {name}. Заказ #n{order_code}"
-#
-#     receipt = {
-#         "items": [
-#             {
-#                 "Name": description,
-#                 "Quantity": 1,
-#                 "Sum": price,
-#                 "PaymentMethod": "full_prepayment",
-#                 "PaymentObject": "service",
-#                 "Tax": "none"
-#             }
-#         ]
-#
-#     }
-#     response = robokassa.generate_open_payment_link(
-#         merchant_comments="no comment",
-#         description=description,
-#         invoice_type=InvoiceType.ONE_TIME,
-#         email=email,
-#         receipt=receipt,
-#         inv_id=order_code,
-#         out_sum=price,
-#         user_id=user_id,  # 👈 кастомное поле
-#         formatted_chapter=formatted_chapter,  # 👈 ещё одно кастомное поле
-#         order_id=order_id  # 👈 и ещё
-#     )
-#
-#     return response.url  # ✅ ВАЖНО: возвращаем строку, а не объект
-
 def create_payment_robokassa(price, email, num_of_chapter, order_code, order_id, user_id):
     chapter_nums = num_of_chapter.split(',')  # Например: ['1', '2']
     formatted_chapters = [f'ch_{num}' for num in chapter_nums]
@@ -146,3 +112,94 @@ def create_payment_robokassa(price, email, num_of_chapter, order_code, order_id,
     )
     logger.info(response)
     return response.url
+
+
+async def create_recurring_payment_robokassa(price, email, num_of_chapter, order_code, order_id, user_id,
+                                             previous_inv_id):
+    """
+    Создает рекуррентный платеж через Robokassa
+
+    Args:
+        price: Сумма платежа
+        email: Email пользователя
+        num_of_chapter: Номера глав (например: "1,2")
+        order_code: Новый код заказа
+        order_id: Новый ID заказа
+        user_id: ID пользователя
+        previous_inv_id: ID первого успешного платежа (для рекуррентных списаний)
+    """
+    chapter_nums = num_of_chapter.split(',')  # Например: ['1', '2']
+    formatted_chapters = [f'ch_{num}' for num in chapter_nums]
+
+    items = []
+
+    for num in chapter_nums:
+        chapter_key = f'ch_{num}'
+        course = config.courses.get(chapter_key)
+        if not course:
+            continue
+
+        items.append({
+            "Name": f"{course['short_name_for_receipt']}",
+            "Quantity": 1,
+            "Sum": course['price'],
+            "PaymentMethod": "full_prepayment",
+            "PaymentObject": "service",
+            "Tax": "none"
+        })
+
+    # Описание для платёжной ссылки (не чек)
+    description = f"Рекуррентный платеж за доступ к курсу. #n{order_code}"
+
+    receipt = {"items": items}
+
+    try:
+        result = await robokassa.execute_recurring_payment(
+            previous_inv_id=previous_inv_id,  # ID первого успешного платежа
+            out_sum=price,
+            inv_id=order_code,
+            description=description,
+            email=email,
+            receipt=receipt,
+            user_ip=None,  # Если у вас есть функция получения IP
+            shp_user_id=user_id,
+            shp_formatted_chapter=",".join(formatted_chapters),
+            shp_order_id=order_id
+        )
+
+        logger.info(f"Recurring payment executed: {result}")
+        return result
+
+    except Exception as e:
+        logger.error(f"Failed to execute recurring payment: {e}")
+        raise e
+
+
+# Пример использования:
+async def charge_monthly_subscription():
+    """
+    Пример функции для ежемесячного списания подписки
+    """
+    try:
+        # Получаем данные подписки из БД
+        first_payment_inv_id = 27167
+        user_email = 'ya.matveev116@ya.ru'
+        subscription_price = 15
+
+        # Выполняем рекуррентный платеж
+        result = await create_recurring_payment_robokassa(
+            price=subscription_price,
+            email=user_email,
+            num_of_chapter='ch_8',
+            order_code=34534534,
+            order_id=9898,
+            user_id=146679674,
+            previous_inv_id=first_payment_inv_id  # ← ID первого платежа
+        )
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Monthly subscription charge failed for user: {e}")
+        # Здесь можно добавить логику уведомления пользователя об ошибке
+        raise e
