@@ -187,9 +187,17 @@ async def sync_job_queue_with_db(context):
     try:
         logger.info("🔄 Начинаем синхронизацию job_queue с БД")
         
-        # Очищаем все существующие задачи
-        context.job_queue.clear()
-        logger.info("✅ Очищен job_queue")
+        # Удаляем только задачи подписок
+        job_names_to_remove = []
+        for job in context.job_queue.jobs():
+            if job.name and (job.name.startswith("charge_") or job.name.startswith("kick_")):
+                job.schedule_removal()
+                job_names_to_remove.append(job.name)
+        
+        if job_names_to_remove:
+            logger.info(f"✅ Удалены задачи подписок: {job_names_to_remove}")
+        else:
+            logger.info("ℹ️ Задач подписок для удаления не найдено")
         
         # Получаем все активные подписки
         active_subscriptions = pdb.get_all_active_subscriptions()
