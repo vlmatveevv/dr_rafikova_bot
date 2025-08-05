@@ -34,7 +34,7 @@ def ch_choose_button(available_courses=None, mode='buy', selected=None, menu_pat
 
         button = InlineKeyboardButton(
             text=name,
-            callback_data=f'{mode}_chapter:course:{menu_path}'
+            callback_data=f'{mode}_chapter:{menu_path}'
         )
         keyboard.append([button])
 

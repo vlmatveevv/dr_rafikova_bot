@@ -127,7 +127,7 @@ async def register(update: Update, context: CallbackContext) -> int:
     if not await user_exists_pdb(user_id):
         pdb.add_user(user_id, username, first_name, last_name)
 
-    keyboard = [[InlineKeyboardButton(config.bot_btn['buy_courses'], callback_data='pay_chapter:course')]]
+    keyboard = [[InlineKeyboardButton(config.bot_btn['buy_courses'], callback_data='pay_chapter')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await context.bot.send_message(
@@ -284,9 +284,10 @@ async def buy_chapter_callback_handle(update: Update, context: CallbackContext) 
     await query.answer()
     user_id = query.from_user.id
 
-    course_key = query.data.split(':')[1]
+    # У нас только один курс
+    course_key = 'course'
     try:
-        menu_path = query.data.split(':')[2]
+        menu_path = query.data.split(':')[1]
     except Exception:
         menu_path = 'default'
 
@@ -310,7 +311,7 @@ async def buy_chapter_callback_handle(update: Update, context: CallbackContext) 
         ])
     else:
         keyboard.append([
-            InlineKeyboardButton(config.bot_btn['go_to_pay'], callback_data=f'pay_chapter:{course_key}')
+            InlineKeyboardButton(config.bot_btn['go_to_pay'], callback_data='pay_chapter')
         ])
 
     keyboard.append([
@@ -332,7 +333,8 @@ async def pay_chapter_callback_handle(update: Update, context: CallbackContext) 
     await query.answer()
     user_id = query.from_user.id
 
-    course_key = query.data.split(':')[1]
+    # У нас только один курс
+    course_key = 'course'
     course = config.courses.get(course_key)
 
     if not course:
@@ -386,12 +388,12 @@ async def start_payment_handle(update: Update, context: CallbackContext, selecte
     query = update.callback_query
     user_id = query.from_user.id
 
-    # Теперь у нас только один курс, берем первый из списка
-    course_key = selected_courses[0] if selected_courses else 'course'
+    # У нас только один курс
+    course_key = 'course'
     order_code = other_func.generate_order_number()
     order_id = pdb.create_order(user_id=user_id, course_chapter=course_key, order_code=order_code)
 
-    context.user_data['selected_courses'] = selected_courses
+    context.user_data['selected_courses'] = [course_key]
     context.user_data['order_id'] = order_id
     context.user_data['order_code'] = order_code
 
@@ -608,8 +610,8 @@ async def toggle_multi_buy_chapter(update: Update, context: CallbackContext) -> 
     await query.answer()
 
     user_id = query.from_user.id
-    data = query.data  # Пример: "multi_buy_chapter:course"
-    course_key = data.split(":")[1]
+    data = query.data  # Пример: "multi_buy_chapter:default"
+    course_key = 'course'  # У нас только один курс
 
     selected = context.user_data.get("multi_buy_selected", [])
 
@@ -814,7 +816,7 @@ async def post_init(application: Application) -> None:
 
 buy_course_conversation = ConversationHandler(
     entry_points=[
-        CallbackQueryHandler(pay_chapter_callback_handle, pattern="^pay_chapter:"),
+        CallbackQueryHandler(pay_chapter_callback_handle, pattern="^pay_chapter$"),
         CallbackQueryHandler(confirm_multi_buy_handle, pattern="^confirm_buy_multiply$")
     ],
     states={
@@ -859,7 +861,7 @@ def run():
     application.add_handler(CommandHandler('zxc', zxc_command))
 
     application.add_handler(CallbackQueryHandler(buy_courses_callback_handle, pattern="^buy_courses$"))
-    application.add_handler(CallbackQueryHandler(buy_chapter_callback_handle, pattern="^buy_chapter:"))
+    application.add_handler(CallbackQueryHandler(buy_chapter_callback_handle, pattern="^buy_chapter$"))
 
     application.add_handler(CallbackQueryHandler(buy_multiply_callback_handle, pattern="^buy_multiply$"))
 
