@@ -127,7 +127,8 @@ def schedule_subscription_jobs(context, user_id: int, subscription_id: int):
     """
     try:
         # Вычисляем дату следующего платежа (то же число следующего месяца)
-        now = datetime.now()
+        from datetime import timezone
+        now = datetime.now(timezone.utc)
         if now.month == 12:
             # Если декабрь, то следующий месяц - январь следующего года
             next_month = now.replace(year=now.year + 1, month=1)
@@ -208,7 +209,8 @@ async def sync_job_queue_with_db(context):
             next_payment_date = subscription['next_payment_date']
             
             # Вычисляем время до следующего платежа
-            now = datetime.now()
+            from datetime import timezone
+            now = datetime.now(timezone.utc)
             time_until_payment = next_payment_date - now
             
             # Если время еще не наступило, создаем задачу
@@ -246,7 +248,8 @@ def schedule_daily_sync(context):
     """
     try:
         # Вычисляем время до следующего 04:00
-        now = datetime.now()
+        from datetime import timezone
+        now = datetime.now(timezone.utc)
         tomorrow_4am = now.replace(hour=4, minute=0, second=0, microsecond=0) + timedelta(days=1)
         time_until_4am = tomorrow_4am - now
         
