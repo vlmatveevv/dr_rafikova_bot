@@ -236,7 +236,7 @@ async def cancel_sub_command(update: Update, context: CallbackContext) -> None:
 
 
 async def zxc_command(update: Update, context: CallbackContext) -> None:
-    await payment.charge_monthly_subscription()
+    await sync_job_queue_with_db(context)
 
 
 async def sync_jobs_command(update: Update, context: CallbackContext) -> None:
