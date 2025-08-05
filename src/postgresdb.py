@@ -662,6 +662,95 @@ class Database:
             print(f"❌ Ошибка при получении активных подписок: {e}")
             return []
 
+
+
+    def schedule_job(self, user_id: int, subscription_id: int, job_type: str, run_at: datetime) -> int:
+        """
+        Создает задачу в scheduled_jobs для резерва.
+        
+        :param user_id: Telegram user ID
+        :param subscription_id: ID подписки
+        :param job_type: Тип задачи ('charge', 'kick', 'notify')
+        :param run_at: Время выполнения
+        :return: job_id
+        """
+        try:
+            with self.conn.cursor() as cursor:
+                query = """
+                    INSERT INTO scheduled_jobs (user_id, subscription_id, job_type, run_at)
+                    VALUES (%s, %s, %s, %s)
+                    RETURNING job_id;
+                """
+                cursor.execute(query, (user_id, subscription_id, job_type, run_at))
+                job_id = cursor.fetchone()[0]
+                self.conn.commit()
+                return job_id
+        except Exception as e:
+            print(f"❌ Ошибка при создании задачи в БД: {e}")
+            self.conn.rollback()
+            raise
+
+    def mark_job_done(self, job_id: int):
+        """
+        Отмечает задачу как выполненную.
+        
+        :param job_id: ID задачи
+        """
+        try:
+            with self.conn.cursor() as cursor:
+                query = """
+                    UPDATE scheduled_jobs 
+                    SET status = 'done', updated_at = CURRENT_TIMESTAMP
+                    WHERE job_id = %s
+                """
+                cursor.execute(query, (job_id,))
+                self.conn.commit()
+        except Exception as e:
+            print(f"❌ Ошибка при отметке задачи как выполненной: {e}")
+            self.conn.rollback()
+            raise
+
+    def cancel_job(self, job_id: int):
+        """
+        Отменяет задачу.
+        
+        :param job_id: ID задачи
+        """
+        try:
+            with self.conn.cursor() as cursor:
+                query = """
+                    UPDATE scheduled_jobs 
+                    SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
+                    WHERE job_id = %s
+                """
+                cursor.execute(query, (job_id,))
+                self.conn.commit()
+        except Exception as e:
+            print(f"❌ Ошибка при отмене задачи: {e}")
+            self.conn.rollback()
+            raise
+
+    def update_order_email(self, order_id: int, email: str):
+        """
+        Обновляет email в заказе.
+        
+        :param order_id: ID заказа
+        :param email: Email адрес
+        """
+        try:
+            with self.conn.cursor() as cursor:
+                query = """
+                    UPDATE orders 
+                    SET email = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE order_id = %s
+                """
+                cursor.execute(query, (email, order_id))
+                self.conn.commit()
+        except Exception as e:
+            print(f"❌ Ошибка при обновлении email заказа: {e}")
+            self.conn.rollback()
+            raise
+
     def cancel_subscription(self, subscription_id: int):
         """
         Отменяет подписку.

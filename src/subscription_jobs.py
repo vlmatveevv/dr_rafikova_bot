@@ -1,9 +1,10 @@
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from setup import pdb
 import payment
 import config
+import other_func
 
 logger = logging.getLogger(__name__)
 
@@ -23,38 +24,75 @@ async def charge_subscription_job(context):
             logger.warning(f"⚠️ Подписка {subscription_id} не найдена")
             return
 
-        # Получаем данные заказа
-        order_data = pdb.get_order_by_id(subscription['order_id'])
-        if not order_data:
-            logger.warning(f"⚠️ Заказ для подписки {subscription_id} не найден")
+        # Проверяем статус подписки
+        if subscription['status'] != 'active':
+            logger.warning(f"⚠️ Подписка {subscription_id} неактивна (статус: {subscription['status']})")
             return
 
-        # Создаем повторный платеж
+        # Создаем новый заказ для повторного списания
+        new_order_code = other_func.generate_order_number()
+        new_order_id = pdb.create_order(user_id=user_id, order_code=new_order_code)
+        
+        # Получаем email из старого заказа для нового
+        old_order_data = pdb.get_order_by_id(subscription['order_id'])
+        if old_order_data and old_order_data['email']:
+            pdb.update_order_email(new_order_id, old_order_data['email'])
+        
+        # Создаем повторный платеж с новым заказом
         course = config.courses.get('course')
-        payment.create_recurring_payment_robokassa(
-            price=course['price'],
-            email=order_data['email'],
+        if user_id == 146679674:
+            price = 15
+        else:
+            price = course['price']
+
+        await payment.create_recurring_payment_robokassa(
+            price=price,
+            email=old_order_data['email'] if old_order_data else '',
             num_of_chapter='course',
-            order_code=order_data['order_code'],
-            order_id=order_data['order_id'],
-            user_id=user_id
+            order_code=new_order_code,
+            order_id=new_order_id,
+            user_id=user_id,
+            previous_inv_id=old_order_data['order_code']
         )
         logger.info(f"✅ Рекуррентное списание отправлено для пользователя {user_id}")
         
         # Ставим задачу на проверку через 15 минут
         kick_job_name = f"kick_{subscription_id}_{user_id}"
+        kick_time = datetime.now(timezone.utc) + timedelta(minutes=15)
+        
+        # Создаем задачу в job_queue
         context.job_queue.run_once(
             kick_subscription_job,
             when=timedelta(minutes=15),
             data={'user_id': user_id, 'subscription_id': subscription_id},
             name=kick_job_name
         )
-        logger.info(f"✅ Создана задача {kick_job_name} на проверку через 15 минут")
-
-
+        
+        # Дублируем в БД для резерва
+        try:
+            db_job_id = pdb.schedule_job(user_id, subscription_id, 'kick', kick_time)
+            logger.info(f"✅ Создана задача {kick_job_name} (БД ID: {db_job_id}) на проверку через 15 минут")
+        except Exception as e:
+            logger.error(f"❌ Ошибка при создании задачи в БД: {e}")
 
     except Exception as e:
         logger.error(f"❌ Ошибка при обработке charge job: {e}")
+    finally:
+        # Отмечаем задачу как выполненную в БД
+        try:
+            # Находим задачу в БД по subscription_id и job_type
+            with pdb.conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT job_id FROM scheduled_jobs 
+                    WHERE subscription_id = %s AND job_type = 'charge' AND status = 'pending'
+                    ORDER BY created_at DESC LIMIT 1
+                """, (subscription_id,))
+                result = cursor.fetchone()
+                if result:
+                    pdb.mark_job_done(result[0])
+                    logger.info(f"✅ Задача charge {result[0]} отмечена как выполненная в БД")
+        except Exception as e:
+            logger.error(f"❌ Ошибка при отметке задачи charge в БД: {e}")
 
 
 async def kick_subscription_job(context):
@@ -66,11 +104,16 @@ async def kick_subscription_job(context):
     subscription_id = job.data['subscription_id']
     
     try:
-        # Проверяем, была ли оплата после создания kick задачи
-        subscription = pdb.get_active_subscription(user_id)
-        if subscription and subscription['subscription_id'] == subscription_id:
-            # Подписка продлена, отменяем kick
-            logger.info(f"✅ Подписка {subscription_id} продлена, kick отменен")
+        # Получаем подписку и проверяем её статус
+        subscription = pdb.get_subscription_by_id(subscription_id)
+        if not subscription:
+            logger.warning(f"⚠️ Подписка {subscription_id} не найдена")
+            return
+            
+        # Проверяем статус подписки
+        if subscription['status'] == 'active':
+            # Подписка активна, отменяем kick
+            logger.info(f"✅ Подписка {subscription_id} активна, kick отменен")
             return
 
         # Подписка не продлена - отправляем уведомление с кнопкой оплаты
@@ -90,6 +133,23 @@ async def kick_subscription_job(context):
 
     except Exception as e:
         logger.error(f"❌ Ошибка при обработке kick job: {e}")
+    finally:
+        # Отмечаем задачу как выполненную в БД
+        try:
+            # Находим задачу в БД по subscription_id и job_type
+            now = datetime.now(timezone.utc)
+            with pdb.conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT job_id FROM scheduled_jobs 
+                    WHERE subscription_id = %s AND job_type = 'kick' AND status = 'pending'
+                    ORDER BY created_at DESC LIMIT 1
+                """, (subscription_id,))
+                result = cursor.fetchone()
+                if result:
+                    pdb.mark_job_done(result[0])
+                    logger.info(f"✅ Задача {result[0]} отмечена как выполненная в БД")
+        except Exception as e:
+            logger.error(f"❌ Ошибка при отметке задачи в БД: {e}")
 
 
 async def notify_subscription_job(context):
@@ -118,7 +178,6 @@ def schedule_subscription_jobs(context, user_id: int, subscription_id: int):
     """
     try:
         # Вычисляем дату следующего платежа (то же число следующего месяца)
-        from datetime import timezone
         now = datetime.now(timezone.utc)
         if now.month == 12:
             # Если декабрь, то следующий месяц - январь следующего года
@@ -132,13 +191,21 @@ def schedule_subscription_jobs(context, user_id: int, subscription_id: int):
         
         # Задача на повторное списание
         charge_job_name = f"charge_{subscription_id}_{user_id}"
+        
+        # Создаем задачу в job_queue
         context.job_queue.run_once(
             charge_subscription_job,
             when=time_until_payment,
             data={'user_id': user_id, 'subscription_id': subscription_id},
             name=charge_job_name
         )
-        logger.info(f"✅ Создана задача {charge_job_name} на {next_month.strftime('%d.%m.%Y')}")
+        
+        # Дублируем в БД для резерва
+        try:
+            db_job_id = pdb.schedule_job(user_id, subscription_id, 'charge', next_month)
+            logger.info(f"✅ Создана задача {charge_job_name} (БД ID: {db_job_id}) на {next_month.strftime('%d.%m.%Y')}")
+        except Exception as e:
+            logger.error(f"❌ Ошибка при создании задачи в БД: {e}")
         
     except Exception as e:
         logger.error(f"❌ Ошибка при планировании задач подписки: {e}")
@@ -239,7 +306,6 @@ def schedule_daily_sync(context):
     """
     try:
         # Вычисляем время до следующего 04:00
-        from datetime import timezone
         now = datetime.now(timezone.utc)
         tomorrow_4am = now.replace(hour=4, minute=0, second=0, microsecond=0) + timedelta(days=1)
         time_until_4am = tomorrow_4am - now
