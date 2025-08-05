@@ -299,6 +299,12 @@ async def cancel_sub_keep_callback(update: Update, context: CallbackContext) -> 
     await send_or_edit_message(update, context, text)
 
 
+async def cancel_sub_menu_callback(update: Update, context: CallbackContext) -> None:
+    """Обработчик кнопки отмены подписки из главного меню"""
+    # Просто вызываем существующую функцию
+    await cancel_sub_command(update, context)
+
+
 async def main_menu_callback_handle(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
     await query.answer()
@@ -778,7 +784,7 @@ async def handle_join_request(update: Update, context: CallbackContext):
         reply_markup = InlineKeyboardMarkup(keyboard)
         await context.bot.send_message(
             chat_id=user_id,
-            text=f"Для перехода в канал ({name}) нажмите на кнопку ниже",
+            text=config.bot_msg['channel_access_granted'].format(channel_name=name),
             reply_markup=reply_markup
         )
         logger.info(f"✅ Одобрен вход для пользователя {user_id}")
@@ -956,6 +962,7 @@ def run():
     application.add_handler(CallbackQueryHandler(cancel_sub_confirm_callback, pattern="^cancel_sub_confirm$"))
     application.add_handler(CallbackQueryHandler(cancel_sub_final_callback, pattern="^cancel_sub_final$"))
     application.add_handler(CallbackQueryHandler(cancel_sub_keep_callback, pattern="^cancel_sub_keep$"))
+    application.add_handler(CallbackQueryHandler(cancel_sub_menu_callback, pattern="^cancel_sub$"))
 
     application.add_handler(buy_course_conversation)
     application.add_handler(ChatJoinRequestHandler(handle_join_request))

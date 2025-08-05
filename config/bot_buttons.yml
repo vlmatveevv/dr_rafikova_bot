@@ -15,6 +15,7 @@ main_menu:
   start: "Начать"
   documents: "Правила и документы"
   support: "Служба поддержки"
+  cancel_sub: "Отменить подписку"
 all_courses: "Все курсы"
 my_courses: "Мои оплаченные курсы/доступы"
 sub:

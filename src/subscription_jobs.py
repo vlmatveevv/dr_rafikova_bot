@@ -31,7 +31,7 @@ async def charge_subscription_job(context):
 
         # Создаем повторный платеж
         course = config.courses.get('course')
-        payment_url = payment.create_payment_robokassa(
+        payment.create_recurring_payment_robokassa(
             price=course['price'],
             email=order_data['email'],
             num_of_chapter='course',
@@ -39,18 +39,9 @@ async def charge_subscription_job(context):
             order_id=order_data['order_id'],
             user_id=user_id
         )
-
-        # Отправляем ссылку на оплату пользователю
-        keyboard = [[InlineKeyboardButton("💳 Оплатить", url=payment_url)]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
+        logger.info(f"✅ Рекуррентное списание отправлено для пользователя {user_id}")
         
-        await context.bot.send_message(
-            chat_id=user_id,
-            text="🔄 Время продлить подписку! Нажмите кнопку ниже для оплаты:",
-            reply_markup=reply_markup
-        )
-
-        # Ставим задачу на исключение через 15 минут
+        # Ставим задачу на проверку через 15 минут
         kick_job_name = f"kick_{subscription_id}_{user_id}"
         context.job_queue.run_once(
             kick_subscription_job,
@@ -58,7 +49,9 @@ async def charge_subscription_job(context):
             data={'user_id': user_id, 'subscription_id': subscription_id},
             name=kick_job_name
         )
-        logger.info(f"✅ Создана задача {kick_job_name} на исключение через 15 минут")
+        logger.info(f"✅ Создана задача {kick_job_name} на проверку через 15 минут")
+
+
 
     except Exception as e:
         logger.error(f"❌ Ошибка при обработке charge job: {e}")
@@ -80,21 +73,18 @@ async def kick_subscription_job(context):
             logger.info(f"✅ Подписка {subscription_id} продлена, kick отменен")
             return
 
-        # Подписка не продлена, исключаем из канала
-        course = config.courses.get('course')
-        channel_id = course['channel_id']
+        # Подписка не продлена - отправляем уведомление с кнопкой оплаты
+        keyboard = [[InlineKeyboardButton("💳 Оплатить", callback_data="pay_chapter")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
         
-        try:
-            # Исключаем пользователя из канала
-            await context.bot.ban_chat_member(
-                chat_id=channel_id,
-                user_id=user_id,
-                until_date=datetime.now() + timedelta(seconds=1)  # Бан на 1 секунду = исключение
-            )
-            logger.info(f"✅ Пользователь {user_id} исключен из канала")
-        except Exception as e:
-            logger.error(f"❌ Не удалось исключить пользователя {user_id}: {e}")
-
+        await context.bot.send_message(
+            chat_id=user_id,
+            text="🔄 Время продлить подписку! Нажмите кнопку ниже для оплаты:",
+            reply_markup=reply_markup
+        )
+        
+        logger.info(f"✅ Отправлено уведомление о необходимости оплаты пользователю {user_id}")
+        
         # Обновляем статус подписки
         pdb.update_subscription_status(subscription_id, 'expired')
 

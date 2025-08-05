@@ -118,6 +118,11 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
                 logger.info(f"✅ Подписка {existing_subscription['subscription_id']} продлена")
                 logger.info(f"✅ Задача на повторное списание будет добавлена при следующей синхронизации")
                 
+                # Отменяем kick задачи для этой подписки
+                # К сожалению, у нас нет доступа к context в webhook
+                # Kick задачи будут отменены при проверке в kick_subscription_job
+                logger.info(f"✅ Kick задачи будут отменены при следующей проверке")
+                
             except Exception as e:
                 logger.error(f"❌ Ошибка при продлении подписки: {e}")
                 return "OK"
@@ -148,8 +153,7 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
         background_tasks.add_task(
             telegram_https.send_message,
             user_id=user_id,
-            text=f"🎉 Вы успешно оплатили курс <b>{channel_name}</b>!\n\n"
-                 f"Нажмите кнопку ниже, чтобы вступить в канал:",
+            text=config.bot_msg['payment_success'].format(channel_name=channel_name),
             reply_markup=reply_markup
         )
 
