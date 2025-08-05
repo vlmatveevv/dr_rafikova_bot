@@ -749,9 +749,9 @@ async def handle_join_request(update: Update, context: CallbackContext):
     join_request = update.chat_join_request
     user_id = join_request.from_user.id
     chat_id = update.chat_join_request.chat.id
-    if user_id == 146679674:
-        await join_request.approve()
-        return
+    # if user_id == 146679674:
+    #     await join_request.approve()
+    #     return
     channel_data = config.channel_map.get(chat_id)
 
     if channel_data:
