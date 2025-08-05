@@ -173,21 +173,24 @@ class Database:
     def get_paid_courses_by_user(self, user_id: int) -> list:
         """
         Возвращает список курсов, которые пользователь успешно оплатил.
+        У нас только один курс, поэтому возвращаем ['course'] если есть оплата.
 
         :param user_id: ID пользователя.
-        :return: Список названий курсов (course_chapter).
+        :return: Список с одним элементом ['course'] или пустой список.
         """
         try:
             with self.conn.cursor() as cursor:
                 query = """
-                    SELECT DISTINCT o.course_chapter
-                    FROM orders o
-                    JOIN payments p ON o.order_id = p.order_id
-                    WHERE o.user_id = %s
+                    SELECT EXISTS (
+                        SELECT 1
+                        FROM orders o
+                        JOIN payments p ON o.order_id = p.order_id
+                        WHERE o.user_id = %s
+                    )
                 """
                 cursor.execute(query, (user_id,))
-                result = cursor.fetchall()
-                return [row[0] for row in result]  # список course_chapter
+                has_payment = cursor.fetchone()[0]
+                return ['course'] if has_payment else []
         except Exception as e:
             print(f"Ошибка при получении курсов: {e}")
             return []
@@ -199,25 +202,33 @@ class Database:
         - выданные вручную (manual_access)
 
         :param user_id: Telegram user ID
-        :return: список course_chapter
+        :return: список с одним элементом ['course'] или пустой список
         """
         try:
             with self.conn.cursor() as cursor:
-                query = """
-                    SELECT DISTINCT course_chapter FROM (
-                        SELECT o.course_chapter
+                # Проверяем оплату
+                query_payment = """
+                    SELECT EXISTS (
+                        SELECT 1
                         FROM orders o
                         JOIN payments p ON o.order_id = p.order_id
                         WHERE o.user_id = %s
-                        UNION ALL
-                        SELECT ma.course_chapter
-                        FROM manual_access ma
-                        WHERE ma.user_id = %s
-                    ) AS combined
+                    )
                 """
-                cursor.execute(query, (user_id, user_id))
-                result = cursor.fetchall()
-                return [row[0] for row in result]
+                cursor.execute(query_payment, (user_id,))
+                has_payment = cursor.fetchone()[0]
+
+                # Проверяем ручной доступ
+                query_manual = """
+                    SELECT EXISTS (
+                        SELECT 1 FROM manual_access
+                        WHERE user_id = %s AND course_chapter = 'course'
+                    )
+                """
+                cursor.execute(query_manual, (user_id,))
+                has_manual = cursor.fetchone()[0]
+
+                return ['course'] if (has_payment or has_manual) else []
         except Exception as e:
             print(f"❌ Ошибка при получении всех доступных курсов: {e}")
             return []
@@ -227,40 +238,37 @@ class Database:
         Возвращает список курсов, которые пользователь еще не купил.
 
         :param user_id: Telegram user ID
-        :return: список course_chapter, которые доступны в config.courses, но не куплены
+        :return: список с одним элементом ['course'] если не куплен, иначе пустой список
         """
         try:
             with self.conn.cursor() as cursor:
-                # Получаем уже купленные курсы
+                # Проверяем, есть ли оплата или ручной доступ
                 query = """
-                    SELECT DISTINCT course_chapter FROM (
-                        SELECT o.course_chapter
+                    SELECT EXISTS (
+                        SELECT 1
                         FROM orders o
                         JOIN payments p ON o.order_id = p.order_id
                         WHERE o.user_id = %s
-                        UNION ALL
-                        SELECT ma.course_chapter
-                        FROM manual_access ma
-                        WHERE ma.user_id = %s
-                    ) AS combined
+                    )
+                    OR EXISTS (
+                        SELECT 1 FROM manual_access
+                        WHERE user_id = %s AND course_chapter = 'course'
+                    )
                 """
                 cursor.execute(query, (user_id, user_id))
-                bought_courses = {row[0] for row in cursor.fetchall()}
-
-                # Вычитаем из всех возможных курсов
-                all_courses = set(config.courses.keys())
-                not_bought = list(all_courses - bought_courses)
-                return not_bought
+                has_access = cursor.fetchone()[0]
+                
+                return ['course'] if not has_access else []
         except Exception as e:
             print(f"❌ Ошибка при получении некупленных курсов: {e}")
             return []
 
     def has_paid_course(self, user_id: int, course_chapter: str) -> bool:
         """
-        Проверяет, оплатил ли пользователь указанный курс.
+        Проверяет, оплатил ли пользователь курс.
 
         :param user_id: ID пользователя.
-        :param course_chapter: Название курса.
+        :param course_chapter: Игнорируется, у нас только один курс.
         :return: True, если оплата есть, иначе False.
         """
         try:
@@ -270,34 +278,33 @@ class Database:
                         SELECT 1
                         FROM orders o
                         JOIN payments p ON o.order_id = p.order_id
-                        WHERE o.user_id = %s AND o.course_chapter = %s
+                        WHERE o.user_id = %s
                     )
                 """
-                cursor.execute(query, (user_id, course_chapter))
+                cursor.execute(query, (user_id,))
                 result = cursor.fetchone()
                 return result[0]  # True или False
         except Exception as e:
             print(f"Ошибка при проверке оплаты курса: {e}")
             return False
 
-    def create_order(self, user_id: int, course_chapter: str, order_code: int) -> int:
+    def create_order(self, user_id: int, order_code: int) -> int:
         """
         Создает заказ в таблице orders и возвращает order_id.
         Email будет добавлен позже.
 
         :param user_id: Telegram user ID
-        :param course_chapter: Название курса, например: 'course'
         :param order_code: Уникальный код заказа
         :return: order_id
         """
         try:
             with self.conn.cursor() as cursor:
                 query = """
-                    INSERT INTO orders (user_id, course_chapter, order_code)
-                    VALUES (%s, %s, %s)
+                    INSERT INTO orders (user_id, order_code)
+                    VALUES (%s, %s)
                     RETURNING order_id;
                 """
-                cursor.execute(query, (user_id, course_chapter, order_code))
+                cursor.execute(query, (user_id, order_code))
                 order_id = cursor.fetchone()[0]
                 self.conn.commit()
                 return order_id
@@ -429,14 +436,14 @@ class Database:
             print(f"Error getting order: {e}")
             return None
 
-    def grant_manual_access(self, user_id: int, course_chapter: str, granted_by: int):
+    def grant_manual_access(self, user_id: int, granted_by: int):
         try:
             with self.conn.cursor() as cursor:
                 cursor.execute("""
                     INSERT INTO manual_access (user_id, course_chapter, granted_by)
-                    VALUES (%s, %s, %s)
+                    VALUES (%s, 'course', %s)
                     ON CONFLICT (user_id, course_chapter) DO NOTHING
-                """, (user_id, course_chapter, granted_by))
+                """, (user_id, granted_by))
                 self.conn.commit()
         except Exception as e:
             print(f"❌ Ошибка при добавлении доступа в manual_access: {e}")
@@ -448,7 +455,7 @@ class Database:
         Проверяет, был ли пользователю вручную выдан доступ к курсу.
 
         :param user_id: Telegram ID пользователя.
-        :param course_chapter: Название курса (например, 'course').
+        :param course_chapter: Игнорируется, у нас только один курс.
         :return: True, если доступ есть, иначе False.
         """
         try:
@@ -456,9 +463,9 @@ class Database:
                 cursor.execute("""
                     SELECT EXISTS (
                         SELECT 1 FROM manual_access
-                        WHERE user_id = %s AND course_chapter = %s
+                        WHERE user_id = %s AND course_chapter = 'course'
                     )
-                """, (user_id, course_chapter))
+                """, (user_id,))
                 return cursor.fetchone()[0]
         except Exception as e:
             print(f"❌ Ошибка при проверке ручного доступа: {e}")

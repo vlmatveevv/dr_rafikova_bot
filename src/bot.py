@@ -342,7 +342,7 @@ async def pay_chapter_callback_handle(update: Update, context: CallbackContext) 
         return ConversationHandler.END
 
     order_code = other_func.generate_order_number()
-    order_id = pdb.create_order(user_id=user_id, course_chapter=course_key, order_code=order_code)
+    order_id = pdb.create_order(user_id=user_id, order_code=order_code)
     context.user_data['selected_course'] = course
     context.user_data['course_key'] = course_key
     context.user_data['order_id'] = order_id
@@ -391,7 +391,7 @@ async def start_payment_handle(update: Update, context: CallbackContext, selecte
     # У нас только один курс
     course_key = 'course'
     order_code = other_func.generate_order_number()
-    order_id = pdb.create_order(user_id=user_id, course_chapter=course_key, order_code=order_code)
+    order_id = pdb.create_order(user_id=user_id, order_code=order_code)
 
     context.user_data['selected_courses'] = [course_key]
     context.user_data['order_id'] = order_id
@@ -653,10 +653,11 @@ async def upd_payment_url_handle(update: Update, context: CallbackContext) -> No
     order_code = data.split(':')[1]
     order_data = pdb.get_order_by_code(int(order_code))
 
-    course = config.courses.get(order_data['course_chapter'])
+    # У нас только один курс
+    course = config.courses.get('course')
     user_id = order_data['user_id']
     email = order_data['email']
-    course_key = order_data['course_chapter']
+    course_key = 'course'
     order_id = order_data['order_id']
 
     payment_url = await payment.create_payment(
@@ -702,7 +703,8 @@ async def handle_join_request(update: Update, context: CallbackContext):
     else:
         return
 
-    course_key = config.channel_id_to_key.get(chat_id)
+    # У нас только один курс
+    course_key = 'course'
     logger.info(f"course_key! = {course_key}")
 
     if pdb.has_manual_access(user_id, course_key) or pdb.has_paid_course(user_id, course_key):
@@ -720,8 +722,8 @@ async def handle_join_request(update: Update, context: CallbackContext):
     else:
         await join_request.decline()
         keyboard = [
-            [InlineKeyboardButton("✅ Выдать доступ", callback_data=f"grant_access:{user_id}:{course_key}")],
-            [InlineKeyboardButton("❌ Не выдавать доступ", callback_data=f"deny_access:{user_id}:{course_key}")]
+            [InlineKeyboardButton("✅ Выдать доступ", callback_data=f"grant_access:{user_id}:course")],
+            [InlineKeyboardButton("❌ Не выдавать доступ", callback_data=f"deny_access:{user_id}:course")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await context.bot.send_message(
@@ -739,11 +741,11 @@ async def grant_manual_access_handle(update: Update, context: CallbackContext):
     _, user_id_str, course_key = query.data.split(":")
     user_id = int(user_id_str)
     admin_id = query.from_user.id
-    course = config.courses.get(course_key)
+    course = config.courses.get('course')
     name = course['name'] + course['emoji']
     # Добавим доступ в manual_access
     try:
-        pdb.grant_manual_access(user_id=user_id, course_chapter=course_key, granted_by=admin_id)
+        pdb.grant_manual_access(user_id=user_id, granted_by=admin_id)
         await query.edit_message_text(
             f"✅ Доступ пользователю {user_id} к курсу {name} успешно выдан. Теперь ему нужно заново перейти в канал.")
     except Exception as e:
@@ -755,7 +757,7 @@ async def deny_manual_access(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()
     _, user_id_str, course_key = query.data.split(":")
-    await query.edit_message_text(f"⛔️ Вы отказали в доступе пользователю {user_id_str} к курсу {course_key}.")
+    await query.edit_message_text(f"⛔️ Вы отказали в доступе пользователю {user_id_str} к курсу.")
 
 
 async def go_back_callback_handle(update: Update, context: CallbackContext) -> None:

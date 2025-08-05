@@ -108,29 +108,26 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
             order_id=order_id
         )
 
-        # Разбиваем курсы
-        formatted_chapters = formatted_chapter.split(',')
-        course_names = []
-        for chapter_key in formatted_chapters:
-            course = config.courses.get(chapter_key)
-            if not course:
-                logger.warning(f"❌ Курс по ключу '{chapter_key}' не найден.")
-                continue
+        # У нас только один курс
+        course = config.courses.get('course')
+        if not course:
+            logger.warning(f"❌ Курс не найден.")
+            return "OK"
 
-            course_names.append(course["name"])
-            channel_name = course["name"]
-            channel_invite_url = course["channel_invite_link"]
+        course_names = [course["name"]]
+        channel_name = course["name"]
+        channel_invite_url = course["channel_invite_link"]
 
-            keyboard = [[InlineKeyboardButton("Вступить в канал ✅", url=channel_invite_url)]]
-            reply_markup = InlineKeyboardMarkup(keyboard)
+        keyboard = [[InlineKeyboardButton("Вступить в канал ✅", url=channel_invite_url)]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
 
-            background_tasks.add_task(
-                telegram_https.send_message,
-                user_id=user_id,
-                text=f"🎉 Вы успешно оплатили курс <b>{channel_name}</b>!\n\n"
-                     f"Нажмите кнопку ниже, чтобы вступить в канал:",
-                reply_markup=reply_markup
-            )
+        background_tasks.add_task(
+            telegram_https.send_message,
+            user_id=user_id,
+            text=f"🎉 Вы успешно оплатили курс <b>{channel_name}</b>!\n\n"
+                 f"Нажмите кнопку ниже, чтобы вступить в канал:",
+            reply_markup=reply_markup
+        )
 
         # Подготовка данных о пользователе
         user_info = pdb.get_user_by_user_id(user_id)
@@ -158,7 +155,7 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
             income_amount=income_amount,
             user_id=user_id,
             order_code=inv_id,
-            formatted_chapters=formatted_chapters
+            formatted_chapters=['course']
         )
 
         # Уведомление администратору
