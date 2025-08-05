@@ -34,6 +34,7 @@ from telegram.ext import (
     filters)
 
 import payment
+from subscription_jobs import schedule_subscription_jobs, cancel_subscription_jobs, schedule_daily_sync, sync_job_queue_with_db
 
 # Установка русской локали
 locale.setlocale(locale.LC_TIME, ('ru_RU', 'UTF-8'))
@@ -218,6 +219,14 @@ async def support_callback_handle(update: Update, context: CallbackContext) -> N
 
 
 async def cancel_sub_command(update: Update, context: CallbackContext) -> None:
+    user_id = update.message.from_user.id
+    
+    # Проверяем, есть ли активная подписка
+    if not pdb.has_active_subscription(user_id):
+        text = "❌ У вас нет активной подписки для отмены."
+        await send_or_edit_message(update, context, text)
+        return
+    
     text = config.bot_msg['sub']['cancel']
     keyboard = [
         [InlineKeyboardButton(config.bot_btn['sub']['cancel'], callback_data="cancel_sub_confirm")]
@@ -228,6 +237,23 @@ async def cancel_sub_command(update: Update, context: CallbackContext) -> None:
 
 async def zxc_command(update: Update, context: CallbackContext) -> None:
     await payment.charge_monthly_subscription()
+
+
+async def sync_jobs_command(update: Update, context: CallbackContext) -> None:
+    """Команда для ручной синхронизации job_queue с БД (только для админов)"""
+    user_id = update.message.from_user.id
+    
+    # Проверяем, является ли пользователь админом
+    admin_ids = config.config_env.get('ADMIN_IDS', [])
+    if user_id not in admin_ids:
+        await update.message.reply_text("❌ У вас нет прав для выполнения этой команды.")
+        return
+    
+    try:
+        await sync_job_queue_with_db(context)
+        await update.message.reply_text("✅ Синхронизация job_queue с БД завершена!")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Ошибка при синхронизации: {e}")
 
 
 async def cancel_sub_confirm_callback(update: Update, context: CallbackContext) -> None:
@@ -243,8 +269,29 @@ async def cancel_sub_confirm_callback(update: Update, context: CallbackContext) 
 
 
 async def cancel_sub_final_callback(update: Update, context: CallbackContext) -> None:
-    text = config.bot_msg['sub']['canceled']
-    await send_or_edit_message(update, context, text)
+    user_id = update.callback_query.from_user.id
+    
+    try:
+        # Получаем активную подписку
+        subscription = pdb.get_active_subscription(user_id)
+        if not subscription:
+            text = "❌ Активная подписка не найдена."
+            await send_or_edit_message(update, context, text)
+            return
+        
+        # Отменяем подписку
+        pdb.cancel_subscription(subscription['subscription_id'])
+        
+        # Отменяем задачи в job_queue
+        cancel_subscription_jobs(context, subscription['subscription_id'], user_id)
+        
+        text = config.bot_msg['sub']['canceled']
+        await send_or_edit_message(update, context, text)
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка при отмене подписки: {e}")
+        text = "❌ Произошла ошибка при отмене подписки. Попробуйте позже."
+        await send_or_edit_message(update, context, text)
 
 
 async def cancel_sub_keep_callback(update: Update, context: CallbackContext) -> None:
@@ -305,7 +352,7 @@ async def buy_chapter_callback_handle(update: Update, context: CallbackContext) 
 
     keyboard = []
 
-    if pdb.has_paid_course(user_id, course_key) or pdb.has_manual_access(user_id, course_key):
+    if pdb.has_active_subscription(user_id) or pdb.has_manual_access(user_id, course_key):
         keyboard.append([
             InlineKeyboardButton(config.bot_btn['go_to_channel'], url=course['channel_invite_link'])
         ])
@@ -339,6 +386,16 @@ async def pay_chapter_callback_handle(update: Update, context: CallbackContext) 
 
     if not course:
         await query.edit_message_text("Курс не найден.")
+        return ConversationHandler.END
+
+    # Проверяем, есть ли уже активная подписка
+    if pdb.has_active_subscription(user_id):
+        await query.edit_message_text(
+            "У вас уже есть активная подписка! Если хотите привязать другую карту, сначала отмените текущую подписку.",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("📲 Главное меню", callback_data='main_menu')
+            ]])
+        )
         return ConversationHandler.END
 
     order_code = other_func.generate_order_number()
@@ -707,7 +764,8 @@ async def handle_join_request(update: Update, context: CallbackContext):
     course_key = 'course'
     logger.info(f"course_key! = {course_key}")
 
-    if pdb.has_manual_access(user_id, course_key) or pdb.has_paid_course(user_id, course_key):
+    # Проверяем активную подписку или ручной доступ
+    if pdb.has_manual_access(user_id, course_key) or pdb.has_active_subscription(user_id):
         await join_request.approve()
         keyboard = [
             [InlineKeyboardButton("✅ Перейти в канал", url=channel_invite_link)],
@@ -854,6 +912,9 @@ def run():
         .build()
     )
 
+    # Запускаем ежедневную синхронизацию job_queue с БД
+    schedule_daily_sync(application)
+
     application.add_handler(CommandHandler('start', register))
     # application.add_handler(CommandHandler('my_courses', my_courses_command))
     # application.add_handler(CommandHandler('all_courses', all_courses_command))
@@ -861,6 +922,7 @@ def run():
     application.add_handler(CommandHandler('support', support_command))
     application.add_handler(CommandHandler('cancel_sub', cancel_sub_command))
     application.add_handler(CommandHandler('zxc', zxc_command))
+    application.add_handler(CommandHandler('sync_jobs', sync_jobs_command))
 
     application.add_handler(CallbackQueryHandler(buy_courses_callback_handle, pattern="^buy_courses$"))
     application.add_handler(CallbackQueryHandler(buy_chapter_callback_handle, pattern="^buy_chapter$"))

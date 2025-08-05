@@ -108,6 +108,30 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
             order_id=order_id
         )
 
+        # Проверяем, есть ли уже подписка для этого заказа
+        existing_subscription = pdb.get_active_subscription(user_id)
+        
+        if existing_subscription:
+            # Это повторный платеж - продлеваем подписку
+            try:
+                pdb.extend_subscription(existing_subscription['subscription_id'])
+                logger.info(f"✅ Подписка {existing_subscription['subscription_id']} продлена")
+                logger.info(f"✅ Задача на повторное списание будет добавлена при следующей синхронизации")
+                
+            except Exception as e:
+                logger.error(f"❌ Ошибка при продлении подписки: {e}")
+                return "OK"
+        else:
+            # Это первый платеж - создаем подписку
+            try:
+                subscription_id = pdb.create_subscription(user_id, order_id)
+                logger.info(f"✅ Создана подписка {subscription_id} для пользователя {user_id}")
+                logger.info(f"✅ Задача на повторное списание будет добавлена при следующей синхронизации")
+                
+            except Exception as e:
+                logger.error(f"❌ Ошибка при создании подписки: {e}")
+                return "OK"
+
         # У нас только один курс
         course = config.courses.get('course')
         if not course:

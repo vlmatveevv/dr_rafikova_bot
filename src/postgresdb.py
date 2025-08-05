@@ -4,7 +4,7 @@ from psycopg2 import sql
 from psycopg2.extras import RealDictCursor, execute_values
 import config
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Настройка логгера
 logging.basicConfig(level=logging.INFO)
@@ -436,6 +436,23 @@ class Database:
             print(f"Error getting order: {e}")
             return None
 
+    def get_order_by_id(self, order_id: int):
+        """
+        Получение информации о заказе по order_id.
+        :param order_id: ID заказа.
+        :return: Словарь с данными заказа или None.
+        """
+        try:
+            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute("""
+                    SELECT * FROM orders WHERE order_id = %s
+                """, (order_id,))
+                return cursor.fetchone()
+        except Exception as e:
+            self.conn.rollback()
+            print(f"Error getting order by id: {e}")
+            return None
+
     def grant_manual_access(self, user_id: int, granted_by: int):
         try:
             with self.conn.cursor() as cursor:
@@ -470,3 +487,197 @@ class Database:
         except Exception as e:
             print(f"❌ Ошибка при проверке ручного доступа: {e}")
             return False
+
+    # ===== ФУНКЦИИ ДЛЯ ПОДПИСОК =====
+
+    def create_subscription(self, user_id: int, order_id: int) -> int:
+        """
+        Создает новую подписку.
+        
+        :param user_id: Telegram user ID
+        :param order_id: ID заказа
+        :return: subscription_id
+        """
+        try:
+            with self.conn.cursor() as cursor:
+                # Вычисляем дату следующего платежа (то же число следующего месяца)
+                now = datetime.now()
+                if now.month == 12:
+                    # Если декабрь, то следующий месяц - январь следующего года
+                    next_payment_date = now.replace(year=now.year + 1, month=1)
+                else:
+                    # Иначе просто увеличиваем месяц
+                    next_payment_date = now.replace(month=now.month + 1)
+                
+                # Устанавливаем даты: начало сейчас, конец через месяц
+                query = """
+                    INSERT INTO subscriptions (user_id, order_id, start_date, end_date, next_payment_date)
+                    VALUES (%s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '1 month', %s)
+                    RETURNING subscription_id;
+                """
+                cursor.execute(query, (user_id, order_id, next_payment_date))
+                subscription_id = cursor.fetchone()[0]
+                self.conn.commit()
+                return subscription_id
+        except Exception as e:
+            print(f"❌ Ошибка при создании подписки: {e}")
+            self.conn.rollback()
+            raise
+
+    def get_active_subscription(self, user_id: int):
+        """
+        Получает активную подписку пользователя.
+        
+        :param user_id: Telegram user ID
+        :return: Словарь с данными подписки или None
+        """
+        try:
+            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                query = """
+                    SELECT * FROM subscriptions 
+                    WHERE user_id = %s AND status = 'active' AND end_date > CURRENT_TIMESTAMP
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                """
+                cursor.execute(query, (user_id,))
+                return cursor.fetchone()
+        except Exception as e:
+            print(f"❌ Ошибка при получении активной подписки: {e}")
+            return None
+
+    def update_subscription_status(self, subscription_id: int, status: str):
+        """
+        Обновляет статус подписки.
+        
+        :param subscription_id: ID подписки
+        :param status: Новый статус
+        """
+        try:
+            with self.conn.cursor() as cursor:
+                query = """
+                    UPDATE subscriptions 
+                    SET status = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE subscription_id = %s
+                """
+                cursor.execute(query, (status, subscription_id))
+                self.conn.commit()
+        except Exception as e:
+            print(f"❌ Ошибка при обновлении статуса подписки: {e}")
+            self.conn.rollback()
+            raise
+
+    def extend_subscription(self, subscription_id: int):
+        """
+        Продлевает подписку на месяц.
+        
+        :param subscription_id: ID подписки
+        """
+        try:
+            with self.conn.cursor() as cursor:
+                # Получаем текущую дату следующего платежа
+                cursor.execute("""
+                    SELECT next_payment_date FROM subscriptions WHERE subscription_id = %s
+                """, (subscription_id,))
+                current_next_payment = cursor.fetchone()[0]
+                
+                # Вычисляем новую дату (то же число следующего месяца)
+                if current_next_payment.month == 12:
+                    # Если декабрь, то следующий месяц - январь следующего года
+                    new_next_payment = current_next_payment.replace(year=current_next_payment.year + 1, month=1)
+                else:
+                    # Иначе просто увеличиваем месяц
+                    new_next_payment = current_next_payment.replace(month=current_next_payment.month + 1)
+                
+                # Обновляем подписку
+                query = """
+                    UPDATE subscriptions 
+                    SET end_date = end_date + INTERVAL '1 month',
+                        next_payment_date = %s,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE subscription_id = %s
+                """
+                cursor.execute(query, (new_next_payment, subscription_id))
+                self.conn.commit()
+        except Exception as e:
+            print(f"❌ Ошибка при продлении подписки: {e}")
+            self.conn.rollback()
+            raise
+
+    def has_active_subscription(self, user_id: int) -> bool:
+        """
+        Проверяет, есть ли у пользователя активная подписка.
+        
+        :param user_id: Telegram user ID
+        :return: True, если есть активная подписка
+        """
+        try:
+            with self.conn.cursor() as cursor:
+                query = """
+                    SELECT EXISTS (
+                        SELECT 1 FROM subscriptions 
+                        WHERE user_id = %s AND status = 'active' AND end_date > CURRENT_TIMESTAMP
+                    )
+                """
+                cursor.execute(query, (user_id,))
+                return cursor.fetchone()[0]
+        except Exception as e:
+            print(f"❌ Ошибка при проверке активной подписки: {e}")
+            return False
+
+    def get_subscription_by_id(self, subscription_id: int):
+        """
+        Получает подписку по ID.
+        
+        :param subscription_id: ID подписки
+        :return: Словарь с данными подписки или None
+        """
+        try:
+            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                query = """
+                    SELECT * FROM subscriptions 
+                    WHERE subscription_id = %s
+                """
+                cursor.execute(query, (subscription_id,))
+                return cursor.fetchone()
+        except Exception as e:
+            print(f"❌ Ошибка при получении подписки: {e}")
+            return None
+
+    def get_all_active_subscriptions(self):
+        """
+        Получает все активные подписки.
+        
+        :return: Список активных подписок
+        """
+        try:
+            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                query = """
+                    SELECT * FROM subscriptions 
+                    WHERE status = 'active' AND end_date > CURRENT_TIMESTAMP
+                    ORDER BY next_payment_date ASC
+                """
+                cursor.execute(query)
+                return cursor.fetchall()
+        except Exception as e:
+            print(f"❌ Ошибка при получении активных подписок: {e}")
+            return []
+
+    def cancel_subscription(self, subscription_id: int):
+        """
+        Отменяет подписку.
+        
+        :param subscription_id: ID подписки
+        """
+        try:
+            with self.conn.cursor() as cursor:
+                query = """
+                    UPDATE subscriptions 
+                    SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
+                    WHERE subscription_id = %s
+                """
+                cursor.execute(query, (subscription_id,))
+                self.conn.commit()
+        except Exception as e:
+            print(f"❌ Ошибка при отмене подписки: {e}")
+            self.conn.rollback()
+            raise
