@@ -244,7 +244,7 @@ async def sync_jobs_command(update: Update, context: CallbackContext) -> None:
     user_id = update.message.from_user.id
     
     # Проверяем, является ли пользователь админом
-    admin_ids = config.config_env.get('ADMIN_IDS', [])
+    admin_ids = [146679674]
     if user_id not in admin_ids:
         await update.message.reply_text("❌ У вас нет прав для выполнения этой команды.")
         return
