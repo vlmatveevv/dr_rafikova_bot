@@ -192,36 +192,6 @@ class Database:
             print(f"Ошибка при получении курсов: {e}")
             return []
 
-    # def get_all_user_courses(self, user_id: int) -> list:
-    #     """
-    #     Возвращает список всех курсов, к которым у пользователя есть доступ:
-    #     - оплаченные
-    #     - выданные вручную (manual_access)
-    #
-    #     :param user_id: Telegram user ID
-    #     :return: список course_chapter
-    #     """
-    #     try:
-    #         with self.conn.cursor() as cursor:
-    #             query = """
-    #                 SELECT DISTINCT course_chapter FROM (
-    #                     SELECT o.course_chapter
-    #                     FROM orders o
-    #                     JOIN payments p ON o.order_id = p.order_id
-    #                     WHERE o.user_id = %s
-    #                     UNION
-    #                     SELECT ma.course_chapter
-    #                     FROM manual_access ma
-    #                     WHERE ma.user_id = %s
-    #                 ) AS combined
-    #             """
-    #             cursor.execute(query, (user_id, user_id))
-    #             result = cursor.fetchall()
-    #             return [row[0] for row in result]
-    #     except Exception as e:
-    #         print(f"❌ Ошибка при получении всех доступных курсов: {e}")
-    #         return []
-
     def get_all_user_courses(self, user_id: int) -> list:
         """
         Возвращает список всех курсов, к которым у пользователя есть доступ:
@@ -234,13 +204,13 @@ class Database:
         try:
             with self.conn.cursor() as cursor:
                 query = """
-                    SELECT DISTINCT unnest(course_chapter) AS chapter FROM (
+                    SELECT DISTINCT course_chapter FROM (
                         SELECT o.course_chapter
                         FROM orders o
                         JOIN payments p ON o.order_id = p.order_id
                         WHERE o.user_id = %s
                         UNION ALL
-                        SELECT ARRAY[ma.course_chapter]  -- manual_access.course_chapter — строка
+                        SELECT ma.course_chapter
                         FROM manual_access ma
                         WHERE ma.user_id = %s
                     ) AS combined
@@ -251,31 +221,6 @@ class Database:
         except Exception as e:
             print(f"❌ Ошибка при получении всех доступных курсов: {e}")
             return []
-
-    # def has_paid_course(self, user_id: int, course_chapter: str) -> bool:
-    #     """
-    #     Проверяет, оплатил ли пользователь указанный курс.
-    #
-    #     :param user_id: ID пользователя.
-    #     :param course_chapter: Название курса/раздела.
-    #     :return: True, если оплата есть, иначе False.
-    #     """
-    #     try:
-    #         with self.conn.cursor() as cursor:
-    #             query = """
-    #                 SELECT EXISTS (
-    #                     SELECT 1
-    #                     FROM orders o
-    #                     JOIN payments p ON o.order_id = p.order_id
-    #                     WHERE o.user_id = %s AND o.course_chapter = %s
-    #                 )
-    #             """
-    #             cursor.execute(query, (user_id, course_chapter))
-    #             result = cursor.fetchone()
-    #             return result[0]  # True или False
-    #     except Exception as e:
-    #         print(f"Ошибка при проверке оплаты курса: {e}")
-    #         return False
 
     def get_not_bought_courses(self, user_id: int) -> list:
         """
@@ -288,13 +233,13 @@ class Database:
             with self.conn.cursor() as cursor:
                 # Получаем уже купленные курсы
                 query = """
-                    SELECT DISTINCT unnest(course_chapter) AS chapter FROM (
+                    SELECT DISTINCT course_chapter FROM (
                         SELECT o.course_chapter
                         FROM orders o
                         JOIN payments p ON o.order_id = p.order_id
                         WHERE o.user_id = %s
                         UNION ALL
-                        SELECT ARRAY[ma.course_chapter]
+                        SELECT ma.course_chapter
                         FROM manual_access ma
                         WHERE ma.user_id = %s
                     ) AS combined
@@ -315,7 +260,7 @@ class Database:
         Проверяет, оплатил ли пользователь указанный курс.
 
         :param user_id: ID пользователя.
-        :param course_chapter: Название курса/раздела.
+        :param course_chapter: Название курса.
         :return: True, если оплата есть, иначе False.
         """
         try:
@@ -325,7 +270,7 @@ class Database:
                         SELECT 1
                         FROM orders o
                         JOIN payments p ON o.order_id = p.order_id
-                        WHERE o.user_id = %s AND %s = ANY(o.course_chapter)
+                        WHERE o.user_id = %s AND o.course_chapter = %s
                     )
                 """
                 cursor.execute(query, (user_id, course_chapter))
@@ -335,34 +280,13 @@ class Database:
             print(f"Ошибка при проверке оплаты курса: {e}")
             return False
 
-    # def create_order(self, user_id: int, course_chapter: str, order_code: int) -> int:
-    #     """
-    #     Создает заказ в таблице orders и возвращает order_id.
-    #     Email будет добавлен позже.
-    #     """
-    #     try:
-    #         with self.conn.cursor() as cursor:
-    #             query = """
-    #                 INSERT INTO orders (user_id, course_chapter, order_code)
-    #                 VALUES (%s, %s, %s)
-    #                 RETURNING order_id;
-    #             """
-    #             cursor.execute(query, (user_id, course_chapter, order_code))
-    #             order_id = cursor.fetchone()[0]
-    #             self.conn.commit()
-    #             return order_id
-    #     except Exception as e:
-    #         print(f"❌ Ошибка при создании заказа: {e}")
-    #         self.conn.rollback()
-    #         raise
-
-    def create_order(self, user_id: int, course_chapter: list[str], order_code: int) -> int:
+    def create_order(self, user_id: int, course_chapter: str, order_code: int) -> int:
         """
         Создает заказ в таблице orders и возвращает order_id.
         Email будет добавлен позже.
 
         :param user_id: Telegram user ID
-        :param course_chapter: Список курсов, например: ['ch1', 'ch3']
+        :param course_chapter: Название курса, например: 'course'
         :param order_code: Уникальный код заказа
         :return: order_id
         """
@@ -524,7 +448,7 @@ class Database:
         Проверяет, был ли пользователю вручную выдан доступ к курсу.
 
         :param user_id: Telegram ID пользователя.
-        :param course_chapter: Название курса (например, 'ch_1').
+        :param course_chapter: Название курса (например, 'course').
         :return: True, если доступ есть, иначе False.
         """
         try:

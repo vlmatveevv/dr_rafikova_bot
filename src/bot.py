@@ -154,14 +154,8 @@ async def my_courses_command(update: Update, context: CallbackContext) -> None:
         await send_or_edit_message(update, context, text, reply_markup)
         return
 
-    keyboard = []
-
-    for course_key in available_courses:
-        course = config.courses.get(course_key)
-        if course:
-            keyboard = my_keyboard.ch_choose_button(available_courses=available_courses, menu_path=menu_path)
-
-    keyboard.extend(my_keyboard.main_menu_button_markup())  # <-- исправлено
+    keyboard = my_keyboard.ch_choose_button(available_courses=available_courses, menu_path=menu_path)
+    keyboard.extend(my_keyboard.main_menu_button_markup())
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     text = "Ваши доступные курсы. Нажмите, чтобы перейти:"
@@ -290,17 +284,16 @@ async def buy_chapter_callback_handle(update: Update, context: CallbackContext) 
     await query.answer()
     user_id = query.from_user.id
 
-    num_of_chapter = query.data.split(':')[1]
+    course_key = query.data.split(':')[1]
     try:
         menu_path = query.data.split(':')[2]
     except Exception:
         menu_path = 'default'
 
-    chapter_mask = f'ch_{num_of_chapter}'
-    course = config.courses.get(chapter_mask)
+    course = config.courses.get(course_key)
 
     if not course:
-        await query.edit_message_text("Раздел не найден.")
+        await query.edit_message_text("Курс не найден.")
         return
 
     text = config.bot_msg['buy_chapter_info'].format(
@@ -311,13 +304,13 @@ async def buy_chapter_callback_handle(update: Update, context: CallbackContext) 
 
     keyboard = []
 
-    if pdb.has_paid_course(user_id, chapter_mask) or pdb.has_manual_access(user_id, chapter_mask):
+    if pdb.has_paid_course(user_id, course_key) or pdb.has_manual_access(user_id, course_key):
         keyboard.append([
             InlineKeyboardButton(config.bot_btn['go_to_channel'], url=course['channel_invite_link'])
         ])
     else:
         keyboard.append([
-            InlineKeyboardButton(config.bot_btn['go_to_pay'], callback_data=f'pay_chapter:{num_of_chapter}')
+            InlineKeyboardButton(config.bot_btn['go_to_pay'], callback_data=f'pay_chapter:{course_key}')
         ])
 
     keyboard.append([
@@ -339,18 +332,17 @@ async def pay_chapter_callback_handle(update: Update, context: CallbackContext) 
     await query.answer()
     user_id = query.from_user.id
 
-    num_of_chapter = query.data.split(':')[1]
-    course_mask = f'ch_{num_of_chapter}'
-    course = config.courses.get(course_mask)
+    course_key = query.data.split(':')[1]
+    course = config.courses.get(course_key)
 
     if not course:
         await query.edit_message_text("Курс не найден.")
         return ConversationHandler.END
 
     order_code = other_func.generate_order_number()
-    order_id = pdb.create_order(user_id=user_id, course_chapter=[course_mask], order_code=order_code)
+    order_id = pdb.create_order(user_id=user_id, course_chapter=course_key, order_code=order_code)
     context.user_data['selected_course'] = course
-    context.user_data['chapter_number'] = num_of_chapter
+    context.user_data['course_key'] = course_key
     context.user_data['order_id'] = order_id
 
     context.user_data['is_in_conversation'] = True
@@ -369,7 +361,7 @@ async def pay_chapter_callback_handle(update: Update, context: CallbackContext) 
         disable_web_page_preview=True
     )
     # return AGREE_OFFER
-    return await start_payment_handle(update, context, [course_mask])
+    return await start_payment_handle(update, context, [course_key])
 
 
 async def confirm_multi_buy_handle(update: Update, context: CallbackContext) -> int:
@@ -394,8 +386,10 @@ async def start_payment_handle(update: Update, context: CallbackContext, selecte
     query = update.callback_query
     user_id = query.from_user.id
 
+    # Теперь у нас только один курс, берем первый из списка
+    course_key = selected_courses[0] if selected_courses else 'course'
     order_code = other_func.generate_order_number()
-    order_id = pdb.create_order(user_id=user_id, course_chapter=selected_courses, order_code=order_code)
+    order_id = pdb.create_order(user_id=user_id, course_chapter=course_key, order_code=order_code)
 
     context.user_data['selected_courses'] = selected_courses
     context.user_data['order_id'] = order_id
@@ -536,11 +530,11 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
     text = "\n".join(text_lines)
     if user_id == 146679674:
         total_price = 15
-    # Создаём платёж (убедись, что функция поддерживает многокурсовую оплату)
+    # Создаём платёж
     payment_url = payment.create_payment_robokassa(
         price=total_price,
         email=email,
-        num_of_chapter=",".join([key.split('_')[1] for key in selected_courses]),
+        num_of_chapter=",".join(selected_courses),
         order_code=order_code,
         order_id=order_id,
         user_id=user_id)
@@ -584,7 +578,6 @@ async def buy_multiply_callback_handle(update: Update, context: CallbackContext)
 
     user_id = query.from_user.id
     not_bought_courses = pdb.get_not_bought_courses(user_id)
-    not_bought_courses = [ch for ch in not_bought_courses if ch != "ch_7"]
 
     if not not_bought_courses:
         text = "Вы уже приобрели все доступные курсы."
@@ -601,7 +594,7 @@ async def buy_multiply_callback_handle(update: Update, context: CallbackContext)
         keyboard += my_keyboard.buy_multiply_menu_items_button()
         keyboard.extend(my_keyboard.main_menu_button_markup())
         reply_markup = InlineKeyboardMarkup(keyboard)
-        text = "Выберите разделы, которые хотите купить. Нажмите ещё раз, чтобы снять выбор."
+        text = "Выберите курсы, которые хотите купить. Нажмите ещё раз, чтобы снять выбор."
 
     await query.edit_message_text(
         text=text,
@@ -615,21 +608,19 @@ async def toggle_multi_buy_chapter(update: Update, context: CallbackContext) -> 
     await query.answer()
 
     user_id = query.from_user.id
-    data = query.data  # Пример: "multi_buy_chapter:1"
-    chapter_num = data.split(":")[1]
-    chapter_key = f"ch_{chapter_num}"
+    data = query.data  # Пример: "multi_buy_chapter:course"
+    course_key = data.split(":")[1]
 
     selected = context.user_data.get("multi_buy_selected", [])
 
-    if chapter_key in selected:
-        selected.remove(chapter_key)
+    if course_key in selected:
+        selected.remove(course_key)
     else:
-        selected.append(chapter_key)
+        selected.append(course_key)
 
     context.user_data["multi_buy_selected"] = selected
 
     not_bought_courses = pdb.get_not_bought_courses(user_id)
-    not_bought_courses = [ch for ch in not_bought_courses if ch != "ch_7"]
 
     keyboard = my_keyboard.ch_choose_button(
         available_courses=not_bought_courses,
@@ -641,7 +632,7 @@ async def toggle_multi_buy_chapter(update: Update, context: CallbackContext) -> 
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await query.edit_message_text(
-        text="Выберите разделы, которые хотите купить. Нажмите ещё раз, чтобы снять выбор.",
+        text="Выберите курсы, которые хотите купить. Нажмите ещё раз, чтобы снять выбор.",
         reply_markup=reply_markup,
         parse_mode=ParseMode.HTML
     )
@@ -663,14 +654,14 @@ async def upd_payment_url_handle(update: Update, context: CallbackContext) -> No
     course = config.courses.get(order_data['course_chapter'])
     user_id = order_data['user_id']
     email = order_data['email']
-    num = order_data['course_chapter'].split('_')[1]
+    course_key = order_data['course_chapter']
     order_id = order_data['order_id']
 
     payment_url = await payment.create_payment(
         price=course['price'],
         user_id=user_id,
         email=email,
-        num_of_chapter=num,
+        num_of_chapter=course_key,
         order_id=order_id,
         order_code=order_code
     )
@@ -683,7 +674,7 @@ async def upd_payment_url_handle(update: Update, context: CallbackContext) -> No
         text=config.bot_msg['confirm_purchase'].format(
             email=email,
             name=course['name'] + course['emoji'],
-            num=num,
+            num=course_key,
             price=course['price'],
         ),
         reply_markup=reply_markup,

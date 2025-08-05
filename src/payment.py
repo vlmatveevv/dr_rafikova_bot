@@ -28,8 +28,7 @@ Configuration.secret_key = config.config_env['SECRET_KEY']
 
 
 async def create_payment(price, user_id, email, num_of_chapter, order_id, order_code):
-    formatted_chapter = f'ch_{num_of_chapter}'
-    course = config.courses.get(formatted_chapter)
+    course = config.courses.get(num_of_chapter)
     name = course['name']
     short_name_for_receipt = course['short_name_for_receipt']
     payment = Payment.create({
@@ -47,7 +46,7 @@ async def create_payment(price, user_id, email, num_of_chapter, order_id, order_
         "metadata": {
             "type": "self",
             "user_id": user_id,
-            "chapter": formatted_chapter,
+            "chapter": num_of_chapter,
             "order_id": order_id
         },
         "receipt": {
@@ -72,14 +71,12 @@ async def create_payment(price, user_id, email, num_of_chapter, order_id, order_
 
 
 def create_payment_robokassa(price, email, num_of_chapter, order_code, order_id, user_id):
-    chapter_nums = num_of_chapter.split(',')  # Например: ['1', '2']
-    formatted_chapters = [f'ch_{num}' for num in chapter_nums]
+    course_keys = num_of_chapter.split(',')  # Например: ['course']
 
     items = []
 
-    for num in chapter_nums:
-        chapter_key = f'ch_{num}'
-        course = config.courses.get(chapter_key)
+    for course_key in course_keys:
+        course = config.courses.get(course_key)
         if not course:
             continue
 
@@ -107,7 +104,7 @@ def create_payment_robokassa(price, email, num_of_chapter, order_code, order_id,
         out_sum=price,
         user_id=user_id,
         recurring=True,
-        formatted_chapter=",".join(formatted_chapters),
+        formatted_chapter=",".join(course_keys),
         order_id=order_id
     )
     logger.info(response)
@@ -122,20 +119,18 @@ async def create_recurring_payment_robokassa(price, email, num_of_chapter, order
     Args:
         price: Сумма платежа
         email: Email пользователя
-        num_of_chapter: Номера глав (например: "1,2")
+        num_of_chapter: Ключи курсов (например: "course")
         order_code: Новый код заказа
         order_id: Новый ID заказа
         user_id: ID пользователя
         previous_inv_id: ID первого успешного платежа (для рекуррентных списаний)
     """
-    chapter_nums = num_of_chapter.split(',')  # Например: ['1', '2']
-    formatted_chapters = [f'ch_{num}' for num in chapter_nums]
+    course_keys = num_of_chapter.split(',')  # Например: ['course']
 
     items = []
 
-    for num in chapter_nums:
-        chapter_key = f'ch_{num}'
-        course = config.courses.get(chapter_key)
+    for course_key in course_keys:
+        course = config.courses.get(course_key)
         if not course:
             continue
 
@@ -163,7 +158,7 @@ async def create_recurring_payment_robokassa(price, email, num_of_chapter, order
             receipt=receipt,
             user_ip=None,  # Если у вас есть функция получения IP
             shp_user_id=user_id,
-            shp_formatted_chapter=",".join(formatted_chapters),
+            shp_formatted_chapter=",".join(course_keys),
             shp_order_id=order_id
         )
 

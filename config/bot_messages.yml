@@ -7,11 +7,11 @@ hello: |
 
   Присоединяйся — я буду рада видеть тебя в нашем сообществе! ❤️
 
-choose_chapter: "Выберите раздел"
+choose_chapter: "Выберите курс"
 buy_chapter_info: |
   <b>{name}
   
-  Содержание раздела:</b>
+  Содержание курса:</b>
   {description}
   <b>Стоимость:</b> {price} ₽
 confirm_purchase_header: |
