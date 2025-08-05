@@ -781,7 +781,7 @@ async def handle_join_request(update: Update, context: CallbackContext):
             text=f"Для перехода в канал ({name}) нажмите на кнопку ниже",
             reply_markup=reply_markup
         )
-        logger.info(f"✅ Одобрен вход для {allowed_users[user_id]} ({user_id})")
+        logger.info(f"✅ Одобрен вход для пользователя {user_id}")
     else:
         await join_request.decline()
         keyboard = [
