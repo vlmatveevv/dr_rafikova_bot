@@ -755,6 +755,9 @@ async def handle_join_request(update: Update, context: CallbackContext):
     #     await join_request.approve()
     #     return
     channel_data = config.channel_map.get(chat_id)
+    logger.info("мы тут")
+    logger.info(chat_id)
+    logger.info(user_id)
 
     if channel_data:
         name = channel_data.get('name')

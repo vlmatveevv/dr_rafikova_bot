@@ -85,10 +85,11 @@ async def kick_subscription_job(context):
         channel_id = course['channel_id']
         
         try:
+            # Исключаем пользователя из канала
             await context.bot.ban_chat_member(
                 chat_id=channel_id,
                 user_id=user_id,
-                until_date=datetime.now() + timedelta(days=1)  # Бан на 1 день
+                until_date=datetime.now() + timedelta(seconds=1)  # Бан на 1 секунду = исключение
             )
             logger.info(f"✅ Пользователь {user_id} исключен из канала")
         except Exception as e:
