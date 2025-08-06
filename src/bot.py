@@ -141,6 +141,13 @@ async def register(update: Update, context: CallbackContext) -> int:
     return ConversationHandler.END
 
 
+async def start_callback_handle(update: Update, context: CallbackContext) -> None:
+    """Обработчик кнопки start из главного меню"""
+    query = update.callback_query
+    await query.answer()
+    await register(update, context)
+
+
 async def my_courses_command(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
 
@@ -935,6 +942,7 @@ def run():
     application.add_handler(CommandHandler('zxc', zxc_command))
     application.add_handler(CommandHandler('sync_jobs', sync_jobs_command))
 
+    application.add_handler(CallbackQueryHandler(start_callback_handle, pattern="^start$"))
     application.add_handler(CallbackQueryHandler(buy_courses_callback_handle, pattern="^buy_courses$"))
     application.add_handler(CallbackQueryHandler(buy_chapter_callback_handle, pattern="^buy_chapter$"))
 

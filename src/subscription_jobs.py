@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 async def charge_subscription_job(context):
     """
-    Задача на повторное списание подписки.
+    Задача на повторное списание подписки с логикой 3 попыток.
     """
     job = context.job
     user_id = job.data['user_id']
@@ -29,6 +29,23 @@ async def charge_subscription_job(context):
             logger.warning(f"⚠️ Подписка {subscription_id} неактивна (статус: {subscription['status']})")
             return
 
+        # Получаем количество попыток списания
+        charge_attempts = pdb.get_charge_attempts(subscription_id)
+        
+        # Проверяем, не превышено ли количество попыток
+        if charge_attempts >= 3:
+            logger.warning(f"⚠️ Превышено количество попыток списания для подписки {subscription_id}")
+            # Удаляем пользователя из канала
+            pdb.remove_user_from_channel(user_id)
+            await context.bot.send_message(
+                chat_id=user_id,
+                text="❌ Ваша подписка была приостановлена из-за неудачных попыток списания. Для восстановления доступа обратитесь в поддержку."
+            )
+            return
+
+        # Увеличиваем счетчик попыток
+        pdb.increment_charge_attempts(subscription_id)
+        
         # Создаем новый заказ для повторного списания
         new_order_code = other_func.generate_order_number()
         new_order_id = pdb.create_order(user_id=user_id, order_code=new_order_code)
@@ -38,6 +55,12 @@ async def charge_subscription_job(context):
         if old_order_data and old_order_data['email']:
             pdb.update_order_email(new_order_id, old_order_data['email'])
         
+        # Получаем первый платеж для рекуррентного списания
+        first_payment_inv_id = pdb.get_first_payment_for_subscription(subscription_id)
+        if not first_payment_inv_id:
+            logger.error(f"❌ Не удалось получить первый платеж для подписки {subscription_id}")
+            return
+        
         # Создаем повторный платеж с новым заказом
         course = config.courses.get('course')
         if user_id == 146679674:
@@ -45,35 +68,57 @@ async def charge_subscription_job(context):
         else:
             price = course['price']
 
-        await payment.create_recurring_payment_robokassa(
-            price=price,
-            email=old_order_data['email'] if old_order_data else '',
-            num_of_chapter='course',
-            order_code=new_order_code,
-            order_id=new_order_id,
-            user_id=user_id,
-            previous_inv_id=old_order_data['order_code']
-        )
-        logger.info(f"✅ Рекуррентное списание отправлено для пользователя {user_id}")
-        
-        # Ставим задачу на проверку через 15 минут
-        kick_job_name = f"kick_{subscription_id}_{user_id}"
-        kick_time = datetime.now(timezone.utc) + timedelta(minutes=15)
-        
-        # Создаем задачу в job_queue
-        context.job_queue.run_once(
-            kick_subscription_job,
-            when=timedelta(minutes=15),
-            data={'user_id': user_id, 'subscription_id': subscription_id},
-            name=kick_job_name
-        )
-        
-        # Дублируем в БД для резерва
         try:
-            db_job_id = pdb.schedule_job(user_id, subscription_id, 'kick', kick_time)
-            logger.info(f"✅ Создана задача {kick_job_name} (БД ID: {db_job_id}) на проверку через 15 минут")
+            await payment.create_recurring_payment_robokassa(
+                price=price,
+                email=old_order_data['email'] if old_order_data else '',
+                num_of_chapter='course',
+                order_code=new_order_code,
+                order_id=new_order_id,
+                user_id=user_id,
+                previous_inv_id=first_payment_inv_id  # Используем первый платеж
+            )
+            logger.info(f"✅ Рекуррентное списание отправлено для пользователя {user_id} (попытка {charge_attempts + 1})")
+            
+            # Если платеж успешен, сбрасываем счетчик попыток и продлеваем подписку
+            pdb.reset_charge_attempts(subscription_id)
+            pdb.extend_subscription(subscription_id)
+            
+            # Планируем следующее списание через месяц
+            schedule_subscription_jobs(context, user_id, subscription_id)
+            
+            await context.bot.send_message(
+                chat_id=user_id,
+                text="✅ Ваша подписка успешно продлена!"
+            )
+            
         except Exception as e:
-            logger.error(f"❌ Ошибка при создании задачи в БД: {e}")
+            logger.error(f"❌ Ошибка при рекуррентном списании: {e}")
+            
+            # Если это последняя попытка, отправляем уведомление
+            if charge_attempts + 1 >= 3:
+                await context.bot.send_message(
+                    chat_id=user_id,
+                    text="⚠️ Не удалось списать оплату за подписку. Это последняя попытка. Пожалуйста, проверьте данные карты или обратитесь в поддержку."
+                )
+            else:
+                # Планируем следующую попытку через день
+                next_attempt_time = datetime.now(timezone.utc) + timedelta(days=1)
+                charge_job_name = f"charge_{subscription_id}_{user_id}"
+                
+                context.job_queue.run_once(
+                    charge_subscription_job,
+                    when=timedelta(days=1),
+                    data={'user_id': user_id, 'subscription_id': subscription_id},
+                    name=charge_job_name
+                )
+                
+                # Дублируем в БД для резерва
+                try:
+                    db_job_id = pdb.schedule_job(user_id, subscription_id, 'charge', next_attempt_time)
+                    logger.info(f"✅ Создана задача {charge_job_name} (БД ID: {db_job_id}) на следующую попытку через день")
+                except Exception as e:
+                    logger.error(f"❌ Ошибка при создании задачи в БД: {e}")
 
     except Exception as e:
         logger.error(f"❌ Ошибка при обработке charge job: {e}")
@@ -116,20 +161,32 @@ async def kick_subscription_job(context):
             logger.info(f"✅ Подписка {subscription_id} активна, kick отменен")
             return
 
-        # Подписка не продлена - отправляем уведомление с кнопкой оплаты
-        keyboard = [[InlineKeyboardButton("💳 Оплатить", callback_data="pay_chapter")]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
+        # Проверяем количество попыток списания
+        charge_attempts = pdb.get_charge_attempts(subscription_id)
         
-        await context.bot.send_message(
-            chat_id=user_id,
-            text="🔄 Время продлить подписку! Нажмите кнопку ниже для оплаты:",
-            reply_markup=reply_markup
-        )
-        
-        logger.info(f"✅ Отправлено уведомление о необходимости оплаты пользователю {user_id}")
-        
-        # Обновляем статус подписки
-        pdb.update_subscription_status(subscription_id, 'expired')
+        if charge_attempts >= 3:
+            # Превышено количество попыток - удаляем из канала
+            pdb.remove_user_from_channel(user_id)
+            await context.bot.send_message(
+                chat_id=user_id,
+                text="❌ Ваша подписка была приостановлена из-за неудачных попыток списания. Для восстановления доступа обратитесь в поддержку."
+            )
+            logger.info(f"✅ Пользователь {user_id} удален из канала из-за превышения попыток списания")
+        else:
+            # Подписка не продлена - отправляем уведомление с кнопкой оплаты
+            keyboard = [[InlineKeyboardButton("💳 Оплатить", callback_data="pay_chapter")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await context.bot.send_message(
+                chat_id=user_id,
+                text="🔄 Время продлить подписку! Нажмите кнопку ниже для оплаты:",
+                reply_markup=reply_markup
+            )
+            
+            logger.info(f"✅ Отправлено уведомление о необходимости оплаты пользователю {user_id}")
+            
+            # Обновляем статус подписки
+            pdb.update_subscription_status(subscription_id, 'expired')
 
     except Exception as e:
         logger.error(f"❌ Ошибка при обработке kick job: {e}")
@@ -177,6 +234,9 @@ def schedule_subscription_jobs(context, user_id: int, subscription_id: int):
     :param subscription_id: ID подписки
     """
     try:
+        # Сбрасываем счетчик попыток списания при создании новой подписки
+        pdb.reset_charge_attempts(subscription_id)
+        
         # Вычисляем дату следующего платежа (то же число следующего месяца)
         now = datetime.now(timezone.utc)
         if now.month == 12:

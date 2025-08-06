@@ -588,11 +588,13 @@ class Database:
                     # Иначе просто увеличиваем месяц
                     new_next_payment = current_next_payment.replace(month=current_next_payment.month + 1)
                 
-                # Обновляем подписку
+                # Обновляем подписку и сбрасываем счетчик попыток
                 query = """
                     UPDATE subscriptions 
                     SET end_date = end_date + INTERVAL '1 month',
                         next_payment_date = %s,
+                        charge_attempts = 0,
+                        last_charge_attempt = NULL,
                         updated_at = CURRENT_TIMESTAMP
                     WHERE subscription_id = %s
                 """
@@ -770,3 +772,117 @@ class Database:
             print(f"❌ Ошибка при отмене подписки: {e}")
             self.conn.rollback()
             raise
+
+    def increment_charge_attempts(self, subscription_id: int):
+        """
+        Увеличивает счетчик попыток списания.
+        
+        :param subscription_id: ID подписки
+        """
+        try:
+            with self.conn.cursor() as cursor:
+                query = """
+                    UPDATE subscriptions 
+                    SET charge_attempts = charge_attempts + 1,
+                        last_charge_attempt = CURRENT_TIMESTAMP,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE subscription_id = %s
+                """
+                cursor.execute(query, (subscription_id,))
+                self.conn.commit()
+        except Exception as e:
+            print(f"❌ Ошибка при увеличении счетчика попыток: {e}")
+            self.conn.rollback()
+            raise
+
+    def reset_charge_attempts(self, subscription_id: int):
+        """
+        Сбрасывает счетчик попыток списания.
+        
+        :param subscription_id: ID подписки
+        """
+        try:
+            with self.conn.cursor() as cursor:
+                query = """
+                    UPDATE subscriptions 
+                    SET charge_attempts = 0,
+                        last_charge_attempt = NULL,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE subscription_id = %s
+                """
+                cursor.execute(query, (subscription_id,))
+                self.conn.commit()
+        except Exception as e:
+            print(f"❌ Ошибка при сбросе счетчика попыток: {e}")
+            self.conn.rollback()
+            raise
+
+    def get_charge_attempts(self, subscription_id: int) -> int:
+        """
+        Получает количество попыток списания.
+        
+        :param subscription_id: ID подписки
+        :return: Количество попыток
+        """
+        try:
+            with self.conn.cursor() as cursor:
+                query = """
+                    SELECT charge_attempts FROM subscriptions 
+                    WHERE subscription_id = %s
+                """
+                cursor.execute(query, (subscription_id,))
+                result = cursor.fetchone()
+                return result[0] if result else 0
+        except Exception as e:
+            print(f"❌ Ошибка при получении количества попыток: {e}")
+            return 0
+
+    def remove_user_from_channel(self, user_id: int):
+        """
+        Удаляет пользователя из канала (устанавливает статус подписки как expired).
+        
+        :param user_id: ID пользователя
+        """
+        try:
+            with self.conn.cursor() as cursor:
+                query = """
+                    UPDATE subscriptions 
+                    SET status = 'expired', updated_at = CURRENT_TIMESTAMP
+                    WHERE user_id = %s AND status = 'active'
+                """
+                cursor.execute(query, (user_id,))
+                self.conn.commit()
+        except Exception as e:
+            print(f"❌ Ошибка при удалении пользователя из канала: {e}")
+            self.conn.rollback()
+            raise
+
+    def get_first_payment_for_subscription(self, subscription_id: int):
+        """
+        Получает первый платеж для подписки (для рекуррентных списаний).
+        
+        :param subscription_id: ID подписки
+        :return: order_code первого платежа или None
+        """
+        try:
+            with self.conn.cursor() as cursor:
+                # Получаем order_id из подписки
+                cursor.execute("""
+                    SELECT order_id FROM subscriptions WHERE subscription_id = %s
+                """, (subscription_id,))
+                result = cursor.fetchone()
+                if not result:
+                    return None
+                
+                order_id = result[0]
+                
+                # Получаем order_code из заказа
+                cursor.execute("""
+                    SELECT order_code FROM orders WHERE order_id = %s
+                """, (order_id,))
+                result = cursor.fetchone()
+                return result[0] if result else None
+                
+        except Exception as e:
+            print(f"❌ Ошибка при получении первого платежа: {e}")
+            return None
