@@ -302,8 +302,23 @@ async def jobs_list_command(update: Update, context: CallbackContext) -> None:
             # Форматируем время выполнения
             if hasattr(job, 'next_t'):
                 from datetime import datetime, timezone
-                next_run = datetime.fromtimestamp(job.next_t, tz=timezone.utc)
-                next_run_str = next_run.strftime('%d.%m.%Y %H:%M:%S UTC')
+                next_run = job.next_t
+                
+                # Проверяем тип next_t
+                if isinstance(next_run, (int, float)):
+                    # Если это timestamp
+                    next_run = datetime.fromtimestamp(next_run, tz=timezone.utc)
+                elif isinstance(next_run, datetime):
+                    # Если это уже datetime объект
+                    if next_run.tzinfo is None:
+                        next_run = next_run.replace(tzinfo=timezone.utc)
+                else:
+                    next_run = None
+                
+                if next_run:
+                    next_run_str = next_run.strftime('%d.%m.%Y %H:%M:%S UTC')
+                else:
+                    next_run_str = "Не определено"
             else:
                 next_run_str = "Не определено"
             
