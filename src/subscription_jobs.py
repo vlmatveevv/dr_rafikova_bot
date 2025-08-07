@@ -395,54 +395,84 @@ async def sync_job_queue_with_db(context):
             # Проверяем, есть ли уже задача в БД для этой подписки
             existing_job_id = pdb.get_pending_job_by_subscription_and_type(subscription_id, 'charge')
             
-            if existing_job_id:
-                logger.info(f"ℹ️ Задача для подписки {subscription_id} уже существует в БД (ID: {existing_job_id}), пропускаем")
-                continue
-            
             # Проверяем, есть ли уже задача в job_queue
             charge_job_name = f"charge_{subscription_id}_{user_id}"
             existing_jobs = context.job_queue.get_jobs_by_name(charge_job_name)
             
-            if existing_jobs:
-                logger.info(f"ℹ️ Задача {charge_job_name} уже существует в job_queue, пропускаем")
+            # Если задача есть в БД, но нет в job_queue - восстанавливаем
+            if existing_job_id and not existing_jobs:
+                logger.info(f"🔄 Восстанавливаем задачу для подписки {subscription_id} из БД")
+                
+                # Вычисляем время до следующего платежа
+                from datetime import timezone
+                now = datetime.now(timezone.utc)
+                time_until_payment = next_payment_date - now
+                
+                if time_until_payment.total_seconds() > 0:
+                    context.job_queue.run_once(
+                        charge_subscription_job,
+                        when=time_until_payment,
+                        data={'user_id': user_id, 'subscription_id': subscription_id},
+                        name=charge_job_name
+                    )
+                    logger.info(f"✅ Восстановлена задача {charge_job_name} на {next_payment_date.strftime('%d.%m.%Y %H:%M')}")
+                else:
+                    # Время уже наступило, создаем срочную задачу
+                    urgent_time = now + timedelta(minutes=1)
+                    context.job_queue.run_once(
+                        charge_subscription_job,
+                        when=timedelta(minutes=1),
+                        data={'user_id': user_id, 'subscription_id': subscription_id},
+                        name=charge_job_name
+                    )
+                    logger.info(f"✅ Восстановлена срочная задача {charge_job_name} - платеж просрочен")
                 continue
             
-            # Вычисляем время до следующего платежа
-            from datetime import timezone
-            now = datetime.now(timezone.utc)
-            time_until_payment = next_payment_date - now
+            # Если задача уже есть и в БД, и в job_queue - пропускаем
+            if existing_job_id and existing_jobs:
+                logger.info(f"ℹ️ Задача для подписки {subscription_id} уже существует в БД и job_queue, пропускаем")
+                continue
             
-            # Если время еще не наступило, создаем задачу
-            if time_until_payment.total_seconds() > 0:
-                context.job_queue.run_once(
-                    charge_subscription_job,
-                    when=time_until_payment,
-                    data={'user_id': user_id, 'subscription_id': subscription_id},
-                    name=charge_job_name
-                )
+            # Если задачи нет ни в БД, ни в job_queue - создаем новую
+            if not existing_job_id and not existing_jobs:
+                logger.info(f"🆕 Создаем новую задачу для подписки {subscription_id}")
                 
-                # Создаем запись в scheduled_jobs
-                try:
-                    db_job_id = pdb.schedule_job(user_id, subscription_id, 'charge', next_payment_date)
-                    logger.info(f"✅ Добавлена задача {charge_job_name} (БД ID: {db_job_id}) на {next_payment_date.strftime('%d.%m.%Y %H:%M')}")
-                except Exception as e:
-                    logger.error(f"❌ Ошибка при создании задачи в БД: {e}")
-            else:
-                # Время уже наступило, создаем задачу на ближайшее время
-                urgent_time = now + timedelta(minutes=1)
-                context.job_queue.run_once(
-                    charge_subscription_job,
-                    when=timedelta(minutes=1),  # Через минуту
-                    data={'user_id': user_id, 'subscription_id': subscription_id},
-                    name=charge_job_name
-                )
+                # Вычисляем время до следующего платежа
+                from datetime import timezone
+                now = datetime.now(timezone.utc)
+                time_until_payment = next_payment_date - now
                 
-                # Создаем запись в scheduled_jobs для срочной задачи
-                try:
-                    db_job_id = pdb.schedule_job(user_id, subscription_id, 'charge', urgent_time)
-                    logger.info(f"✅ Добавлена срочная задача {charge_job_name} (БД ID: {db_job_id}) - платеж просрочен")
-                except Exception as e:
-                    logger.error(f"❌ Ошибка при создании срочной задачи в БД: {e}")
+                # Если время еще не наступило, создаем задачу
+                if time_until_payment.total_seconds() > 0:
+                    context.job_queue.run_once(
+                        charge_subscription_job,
+                        when=time_until_payment,
+                        data={'user_id': user_id, 'subscription_id': subscription_id},
+                        name=charge_job_name
+                    )
+                    
+                    # Создаем запись в scheduled_jobs
+                    try:
+                        db_job_id = pdb.schedule_job(user_id, subscription_id, 'charge', next_payment_date)
+                        logger.info(f"✅ Создана задача {charge_job_name} (БД ID: {db_job_id}) на {next_payment_date.strftime('%d.%m.%Y %H:%M')}")
+                    except Exception as e:
+                        logger.error(f"❌ Ошибка при создании задачи в БД: {e}")
+                else:
+                    # Время уже наступило, создаем задачу на ближайшее время
+                    urgent_time = now + timedelta(minutes=1)
+                    context.job_queue.run_once(
+                        charge_subscription_job,
+                        when=timedelta(minutes=1),  # Через минуту
+                        data={'user_id': user_id, 'subscription_id': subscription_id},
+                        name=charge_job_name
+                    )
+                    
+                    # Создаем запись в scheduled_jobs для срочной задачи
+                    try:
+                        db_job_id = pdb.schedule_job(user_id, subscription_id, 'charge', urgent_time)
+                        logger.info(f"✅ Создана срочная задача {charge_job_name} (БД ID: {db_job_id}) - платеж просрочен")
+                    except Exception as e:
+                        logger.error(f"❌ Ошибка при создании срочной задачи в БД: {e}")
         
         logger.info(f"✅ Синхронизация завершена. Обработано {len(active_subscriptions)} подписок")
         
