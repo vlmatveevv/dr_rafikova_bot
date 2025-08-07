@@ -406,17 +406,30 @@ async def sync_job_queue_with_db(context):
                     data={'user_id': user_id, 'subscription_id': subscription_id},
                     name=charge_job_name
                 )
-                logger.info(f"✅ Добавлена задача {charge_job_name} на {next_payment_date.strftime('%d.%m.%Y %H:%M')}")
+                
+                # Создаем запись в scheduled_jobs
+                try:
+                    db_job_id = pdb.schedule_job(user_id, subscription_id, 'charge', next_payment_date)
+                    logger.info(f"✅ Добавлена задача {charge_job_name} (БД ID: {db_job_id}) на {next_payment_date.strftime('%d.%m.%Y %H:%M')}")
+                except Exception as e:
+                    logger.error(f"❌ Ошибка при создании задачи в БД: {e}")
             else:
                 # Время уже наступило, создаем задачу на ближайшее время
                 charge_job_name = f"charge_{subscription_id}_{user_id}"
+                urgent_time = now + timedelta(minutes=1)
                 context.job_queue.run_once(
                     charge_subscription_job,
                     when=timedelta(minutes=1),  # Через минуту
                     data={'user_id': user_id, 'subscription_id': subscription_id},
                     name=charge_job_name
                 )
-                logger.info(f"✅ Добавлена срочная задача {charge_job_name} (платеж просрочен)")
+                
+                # Создаем запись в scheduled_jobs для срочной задачи
+                try:
+                    db_job_id = pdb.schedule_job(user_id, subscription_id, 'charge', urgent_time)
+                    logger.info(f"✅ Добавлена срочная задача {charge_job_name} (БД ID: {db_job_id}) - платеж просрочен")
+                except Exception as e:
+                    logger.error(f"❌ Ошибка при создании срочной задачи в БД: {e}")
         
         logger.info(f"✅ Синхронизация завершена. Добавлено {len(active_subscriptions)} задач")
         
