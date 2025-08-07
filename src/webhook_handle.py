@@ -113,6 +113,7 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
         
         if existing_subscription:
             # Это повторный платеж - продлеваем подписку
+            subscription_type = "renewal"
             try:
                 pdb.extend_subscription(existing_subscription['subscription_id'])
                 logger.info(f"✅ Подписка {existing_subscription['subscription_id']} продлена")
@@ -128,6 +129,7 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
                 return "OK"
         else:
             # Это первый платеж - создаем подписку
+            subscription_type = "new_sub"
             try:
                 subscription_id = pdb.create_subscription(user_id, order_id)
                 logger.info(f"✅ Создана подписка {subscription_id} для пользователя {user_id}")
@@ -183,7 +185,8 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
             income_amount=income_amount,
             user_id=user_id,
             order_code=inv_id,
-            formatted_chapters=['course']
+            formatted_chapters=['course'],
+            subscription_type=subscription_type
         )
 
         # Уведомление администратору
