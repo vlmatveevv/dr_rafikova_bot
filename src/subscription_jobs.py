@@ -392,6 +392,21 @@ async def sync_job_queue_with_db(context):
             subscription_id = subscription['subscription_id']
             next_payment_date = subscription['next_payment_date']
             
+            # Проверяем, есть ли уже задача в БД для этой подписки
+            existing_job_id = pdb.get_pending_job_by_subscription_and_type(subscription_id, 'charge')
+            
+            if existing_job_id:
+                logger.info(f"ℹ️ Задача для подписки {subscription_id} уже существует в БД (ID: {existing_job_id}), пропускаем")
+                continue
+            
+            # Проверяем, есть ли уже задача в job_queue
+            charge_job_name = f"charge_{subscription_id}_{user_id}"
+            existing_jobs = context.job_queue.get_jobs_by_name(charge_job_name)
+            
+            if existing_jobs:
+                logger.info(f"ℹ️ Задача {charge_job_name} уже существует в job_queue, пропускаем")
+                continue
+            
             # Вычисляем время до следующего платежа
             from datetime import timezone
             now = datetime.now(timezone.utc)
@@ -399,7 +414,6 @@ async def sync_job_queue_with_db(context):
             
             # Если время еще не наступило, создаем задачу
             if time_until_payment.total_seconds() > 0:
-                charge_job_name = f"charge_{subscription_id}_{user_id}"
                 context.job_queue.run_once(
                     charge_subscription_job,
                     when=time_until_payment,
@@ -415,7 +429,6 @@ async def sync_job_queue_with_db(context):
                     logger.error(f"❌ Ошибка при создании задачи в БД: {e}")
             else:
                 # Время уже наступило, создаем задачу на ближайшее время
-                charge_job_name = f"charge_{subscription_id}_{user_id}"
                 urgent_time = now + timedelta(minutes=1)
                 context.job_queue.run_once(
                     charge_subscription_job,
@@ -431,7 +444,7 @@ async def sync_job_queue_with_db(context):
                 except Exception as e:
                     logger.error(f"❌ Ошибка при создании срочной задачи в БД: {e}")
         
-        logger.info(f"✅ Синхронизация завершена. Добавлено {len(active_subscriptions)} задач")
+        logger.info(f"✅ Синхронизация завершена. Обработано {len(active_subscriptions)} подписок")
         
     except Exception as e:
         logger.error(f"❌ Ошибка при синхронизации job_queue: {e}")
