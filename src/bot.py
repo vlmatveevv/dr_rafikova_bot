@@ -263,6 +263,69 @@ async def sync_jobs_command(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text(f"❌ Ошибка при синхронизации: {e}")
 
 
+async def jobs_list_command(update: Update, context: CallbackContext) -> None:
+    """Команда для просмотра задач в job_queue (только для админов)"""
+    user_id = update.message.from_user.id
+    
+    # Проверяем, является ли пользователь админом
+    admin_ids = [146679674]
+    if user_id not in admin_ids:
+        await update.message.reply_text("❌ У вас нет прав для выполнения этой команды.")
+        return
+    
+    try:
+        jobs = context.job_queue.jobs()
+        
+        if not jobs:
+            await update.message.reply_text("📋 Очередь задач пуста")
+            return
+        
+        # Фильтруем только задачи подписок
+        subscription_jobs = [job for job in jobs if job.name and (job.name.startswith("charge_") or job.name.startswith("kick_"))]
+        
+        if not subscription_jobs:
+            await update.message.reply_text("📋 Задач подписок в очереди нет")
+            return
+        
+        # Формируем сообщение с информацией о задачах
+        message = "📋 Задачи в job_queue:\n\n"
+        
+        for i, job in enumerate(subscription_jobs, 1):
+            job_name = job.name or "Без имени"
+            job_data = job.data or {}
+            
+            # Извлекаем информацию из данных задачи
+            user_id_job = job_data.get('user_id', 'N/A')
+            subscription_id = job_data.get('subscription_id', 'N/A')
+            order_id = job_data.get('order_id', 'N/A')
+            
+            # Форматируем время выполнения
+            if hasattr(job, 'next_t'):
+                from datetime import datetime, timezone
+                next_run = datetime.fromtimestamp(job.next_t, tz=timezone.utc)
+                next_run_str = next_run.strftime('%d.%m.%Y %H:%M:%S UTC')
+            else:
+                next_run_str = "Не определено"
+            
+            message += f"🔹 **{i}. {job_name}**\n"
+            message += f"   👤 User ID: `{user_id_job}`\n"
+            message += f"   📋 Subscription ID: `{subscription_id}`\n"
+            if order_id != 'N/A':
+                message += f"   🛒 Order ID: `{order_id}`\n"
+            message += f"   ⏰ Следующий запуск: `{next_run_str}`\n\n"
+        
+        # Если сообщение слишком длинное, разбиваем на части
+        if len(message) > 4096:
+            parts = [message[i:i+4096] for i in range(0, len(message), 4096)]
+            for i, part in enumerate(parts, 1):
+                await update.message.reply_text(f"{part}\n\n*Часть {i}/{len(parts)}*", parse_mode=ParseMode.MARKDOWN)
+        else:
+            await update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN)
+            
+    except Exception as e:
+        await update.message.reply_text(f"❌ Ошибка при получении списка задач: {e}")
+
+
 async def cancel_sub_confirm_callback(update: Update, context: CallbackContext) -> None:
     text = config.bot_msg['sub']['cancel_confirm']
     keyboard = [
@@ -939,6 +1002,7 @@ def run():
     application.add_handler(CommandHandler('cancel_sub', cancel_sub_command))
     application.add_handler(CommandHandler('zxc', zxc_command))
     application.add_handler(CommandHandler('sync_jobs', sync_jobs_command))
+    application.add_handler(CommandHandler('jobs_list', jobs_list_command))
 
     application.add_handler(CallbackQueryHandler(start_callback_handle, pattern="^start$"))
     application.add_handler(CallbackQueryHandler(buy_courses_callback_handle, pattern="^buy_courses$"))
