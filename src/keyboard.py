@@ -63,3 +63,15 @@ def buy_multiply_menu_items_button():
     ]
 
     return buttons
+
+
+def renew_subscription_button_markup():
+    """
+    Кнопка для оформления подписки заново.
+    Используется при неудачных попытках списания.
+    """
+    keyboard = [[InlineKeyboardButton(
+        text=config.bot_btn['renew_subscription'],
+        callback_data='pay_chapter'
+    )]]
+    return InlineKeyboardMarkup(keyboard)

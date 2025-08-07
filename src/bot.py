@@ -406,7 +406,7 @@ async def pay_chapter_callback_handle(update: Update, context: CallbackContext) 
         await query.edit_message_text(
             "У вас уже есть активная подписка! Если хотите привязать другую карту, сначала отмените текущую подписку.",
             reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("📲 Главное меню", callback_data='main_menu')
+                InlineKeyboardButton(config.bot_btn['sub']['cancel'], callback_data='cancel_sub')
             ]])
         )
         return ConversationHandler.END
@@ -600,7 +600,7 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
     text_lines.append(config.bot_msg['confirm_purchase_footer'].format(total=total_price))
 
     text = "\n".join(text_lines)
-    if user_id == 146679674:
+    if user_id == 7768888247:
         total_price = 15
     # Создаём платёж
     payment_url = payment.create_payment_robokassa(
@@ -616,7 +616,7 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
         [InlineKeyboardButton("🚫 Отмена", callback_data='main_menu')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    if user_id == 146679674:
+    if user_id == 7768888247:
         payment_message = await update.message.chat.send_message(
             text=text,
             reply_markup=reply_markup,
@@ -768,9 +768,7 @@ async def handle_join_request(update: Update, context: CallbackContext):
     #     await join_request.approve()
     #     return
     channel_data = config.channel_map.get(chat_id)
-    logger.info("мы тут")
-    logger.info(chat_id)
-    logger.info(user_id)
+    
 
     if channel_data:
         name = channel_data.get('name')

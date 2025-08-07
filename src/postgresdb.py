@@ -500,22 +500,46 @@ class Database:
         """
         try:
             with self.conn.cursor() as cursor:
-                # Вычисляем дату следующего платежа (то же число следующего месяца)
-                now = datetime.now()
-                if now.month == 12:
-                    # Если декабрь, то следующий месяц - январь следующего года
-                    next_payment_date = now.replace(year=now.year + 1, month=1)
-                else:
-                    # Иначе просто увеличиваем месяц
-                    next_payment_date = now.replace(month=now.month + 1)
+                # Проверяем, есть ли отмененная подписка
+                cancelled_subscription = self.get_cancelled_subscription(user_id)
                 
-                # Устанавливаем даты: начало сейчас, конец через месяц
-                query = """
-                    INSERT INTO subscriptions (user_id, order_id, start_date, end_date, next_payment_date)
-                    VALUES (%s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '1 month', %s)
-                    RETURNING subscription_id;
-                """
-                cursor.execute(query, (user_id, order_id, next_payment_date))
+                if cancelled_subscription:
+                    # Новая подписка начинается с даты истечения старой
+                    start_date = cancelled_subscription['end_date']
+                    # Вычисляем дату следующего платежа (то же число следующего месяца)
+                    if start_date.month == 12:
+                        # Если декабрь, то следующий месяц - январь следующего года
+                        next_payment_date = start_date.replace(year=start_date.year + 1, month=1)
+                    else:
+                        # Иначе просто увеличиваем месяц
+                        next_payment_date = start_date.replace(month=start_date.month + 1)
+                    
+                    # Устанавливаем даты: начало с даты истечения старой подписки, конец через месяц
+                    query = """
+                        INSERT INTO subscriptions (user_id, order_id, start_date, end_date, next_payment_date)
+                        VALUES (%s, %s, %s, %s + INTERVAL '1 month', %s)
+                        RETURNING subscription_id;
+                    """
+                    cursor.execute(query, (user_id, order_id, start_date, start_date, next_payment_date))
+                else:
+                    # Обычная логика создания подписки
+                    # Вычисляем дату следующего платежа (то же число следующего месяца)
+                    now = datetime.now()
+                    if now.month == 12:
+                        # Если декабрь, то следующий месяц - январь следующего года
+                        next_payment_date = now.replace(year=now.year + 1, month=1)
+                    else:
+                        # Иначе просто увеличиваем месяц
+                        next_payment_date = now.replace(month=now.month + 1)
+                    
+                    # Устанавливаем даты: начало сейчас, конец через месяц
+                    query = """
+                        INSERT INTO subscriptions (user_id, order_id, start_date, end_date, next_payment_date)
+                        VALUES (%s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '1 month', %s)
+                        RETURNING subscription_id;
+                    """
+                    cursor.execute(query, (user_id, order_id, next_payment_date))
+                
                 subscription_id = cursor.fetchone()[0]
                 self.conn.commit()
                 return subscription_id
@@ -543,6 +567,27 @@ class Database:
                 return cursor.fetchone()
         except Exception as e:
             print(f"❌ Ошибка при получении активной подписки: {e}")
+            return None
+
+    def get_cancelled_subscription(self, user_id: int):
+        """
+        Получает отмененную подписку пользователя с самой поздней датой истечения.
+        
+        :param user_id: Telegram user ID
+        :return: Словарь с данными подписки или None
+        """
+        try:
+            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                query = """
+                    SELECT * FROM subscriptions 
+                    WHERE user_id = %s AND status = 'cancelled' AND end_date > CURRENT_TIMESTAMP
+                    ORDER BY end_date DESC
+                    LIMIT 1
+                """
+                cursor.execute(query, (user_id,))
+                return cursor.fetchone()
+        except Exception as e:
+            print(f"❌ Ошибка при получении отмененной подписки: {e}")
             return None
 
     def update_subscription_status(self, subscription_id: int, status: str):
@@ -885,4 +930,25 @@ class Database:
                 
         except Exception as e:
             print(f"❌ Ошибка при получении первого платежа: {e}")
+            return None
+
+    def get_pending_job_by_subscription_and_type(self, subscription_id: int, job_type: str):
+        """
+        Получает ID последней ожидающей задачи по подписке и типу.
+        
+        :param subscription_id: ID подписки
+        :param job_type: Тип задачи ('charge', 'kick', 'notify')
+        :return: job_id или None
+        """
+        try:
+            with self.conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT job_id FROM scheduled_jobs 
+                    WHERE subscription_id = %s AND job_type = %s AND status = 'pending'
+                    ORDER BY created_at DESC LIMIT 1
+                """, (subscription_id, job_type))
+                result = cursor.fetchone()
+                return result[0] if result else None
+        except Exception as e:
+            print(f"❌ Ошибка при получении ожидающей задачи: {e}")
             return None
