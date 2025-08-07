@@ -559,7 +559,7 @@ class Database:
             with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
                 query = """
                     SELECT * FROM subscriptions 
-                    WHERE user_id = %s AND status = 'active' AND end_date > CURRENT_TIMESTAMP
+                    WHERE user_id = %s AND status = 'active'
                     ORDER BY created_at DESC
                     LIMIT 1
                 """

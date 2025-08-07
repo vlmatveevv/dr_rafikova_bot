@@ -868,6 +868,7 @@ async def handle_join_request(update: Update, context: CallbackContext):
         await context.bot.send_message(
             chat_id=user_id,
             text=config.bot_msg['channel_access_granted'].format(channel_name=name),
+            parse_mode=ParseMode.HTML,
             reply_markup=reply_markup
         )
         logger.info(f"✅ Одобрен вход для пользователя {user_id}")
@@ -1023,21 +1024,21 @@ def run():
     application.add_handler(CallbackQueryHandler(buy_courses_callback_handle, pattern="^buy_courses$"))
     application.add_handler(CallbackQueryHandler(buy_chapter_callback_handle, pattern="^buy_chapter$"))
 
-    application.add_handler(CallbackQueryHandler(buy_multiply_callback_handle, pattern="^buy_multiply$"))
+    # application.add_handler(CallbackQueryHandler(buy_multiply_callback_handle, pattern="^buy_multiply$"))
 
-    application.add_handler(CallbackQueryHandler(toggle_multi_buy_chapter, pattern="^multi_buy_chapter:"))
+    # application.add_handler(CallbackQueryHandler(toggle_multi_buy_chapter, pattern="^multi_buy_chapter:"))
 
     application.add_handler(CallbackQueryHandler(go_back_callback_handle, pattern="^go_back:"))
 
-    application.add_handler(CallbackQueryHandler(clear_selected_multi_buy_callback_handle,
-                                                 pattern="^clear_buy_multiply$"))
+    # application.add_handler(CallbackQueryHandler(clear_selected_multi_buy_callback_handle,
+    #                                              pattern="^clear_buy_multiply$"))
 
     application.add_handler(CallbackQueryHandler(upd_payment_url_handle, pattern="^upd_payment_url:"))
 
     application.add_handler(CallbackQueryHandler(main_menu_callback_handle, pattern="^main_menu$"))
     application.add_handler(CallbackQueryHandler(my_courses_callback_handle, pattern="^my_courses$"))
-    application.add_handler(CallbackQueryHandler(all_courses_callback_handle,
-                                                 pattern=r"^(all_courses|go_back_buy_multiply)$"))
+    # application.add_handler(CallbackQueryHandler(all_courses_callback_handle,
+    #                                              pattern=r"^(all_courses|go_back_buy_multiply)$"))
     application.add_handler(CallbackQueryHandler(documents_callback_handle, pattern="^documents$"))
     application.add_handler(CallbackQueryHandler(support_callback_handle, pattern="^support$"))
 
