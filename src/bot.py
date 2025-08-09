@@ -12,6 +12,7 @@ from pathlib import Path
 import pytz
 import telegram
 import other_func
+from telegram_func import send_or_edit_message, send_or_edit_photo
 from setup import pdb
 import config
 import yaml
@@ -34,7 +35,8 @@ from telegram.ext import (
     filters)
 
 import payment
-from subscription_jobs import schedule_subscription_jobs, cancel_subscription_jobs, schedule_daily_sync, sync_job_queue_with_db
+from subscription_jobs import schedule_subscription_jobs, cancel_subscription_jobs, schedule_daily_sync, \
+    sync_job_queue_with_db
 
 # Установка русской локали
 locale.setlocale(locale.LC_TIME, ('ru_RU', 'UTF-8'))
@@ -80,44 +82,6 @@ async def user_exists_pdb(user_id: int) -> bool:
     return pdb.user_exists(user_id)
 
 
-async def send_or_edit_message(update: Update, context: CallbackContext, text: str,
-                               reply_markup: InlineKeyboardMarkup = None, new_message=False):
-    if new_message:
-        await context.bot.send_message(
-            chat_id=update.effective_user.id,
-            text=text,
-            reply_markup=reply_markup,
-            parse_mode=ParseMode.HTML,
-            disable_web_page_preview=True
-        )
-        return
-    if update.callback_query:
-        if update.callback_query.message.text:
-            await update.callback_query.edit_message_text(
-                text=text,
-                reply_markup=reply_markup,
-                parse_mode=ParseMode.HTML,
-                disable_web_page_preview=True
-            )
-        else:
-            await update.callback_query.message.delete()
-            await context.bot.send_message(
-                chat_id=update.effective_user.id,
-                text=text,
-                reply_markup=reply_markup,
-                parse_mode=ParseMode.HTML,
-                disable_web_page_preview=True
-            )
-    else:
-        await context.bot.send_message(
-            chat_id=update.effective_user.id,
-            text=text,
-            reply_markup=reply_markup,
-            parse_mode=ParseMode.HTML,
-            disable_web_page_preview=True
-        )
-
-
 async def register(update: Update, context: CallbackContext) -> int:
     user_id = update.effective_user.id
     first_name = update.effective_user.first_name or ""
@@ -131,12 +95,15 @@ async def register(update: Update, context: CallbackContext) -> int:
     keyboard = [[InlineKeyboardButton(config.bot_btn['buy_courses'], callback_data='pay_chapter')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    await context.bot.send_message(
-        chat_id=user_id,
-        text=f"{config.bot_msg['hello'].format(first_name=first_name)}",
-        reply_markup=reply_markup,
-        parse_mode=ParseMode.HTML
-    )
+    # await context.bot.send_message(
+    #     chat_id=user_id,
+    #     text=f"{config.bot_msg['hello'].format(first_name=first_name)}",
+    #     reply_markup=reply_markup,
+    #     parse_mode=ParseMode.HTML
+    caption = f"{config.bot_msg['hello'].format(first_name=first_name)}"
+    avatar_img_path = config.media_dir / "avatar.jpg"
+    with open(avatar_img_path, 'rb') as photo:
+        await send_or_edit_photo(update, context, photo, caption, reply_markup)
 
     return ConversationHandler.END
 
@@ -227,13 +194,13 @@ async def support_callback_handle(update: Update, context: CallbackContext) -> N
 
 async def cancel_sub_command(update: Update, context: CallbackContext) -> None:
     user_id = update.message.from_user.id
-    
+
     # Проверяем, есть ли активная подписка
     if not pdb.has_active_subscription(user_id):
         text = "❌ У вас нет активной подписки для отмены."
         await send_or_edit_message(update, context, text)
         return
-    
+
     text = config.bot_msg['sub']['cancel']
     keyboard = [
         [InlineKeyboardButton(config.bot_btn['sub']['cancel'], callback_data="cancel_sub_confirm")]
@@ -249,13 +216,13 @@ async def zxc_command(update: Update, context: CallbackContext) -> None:
 async def sync_jobs_command(update: Update, context: CallbackContext) -> None:
     """Команда для ручной синхронизации job_queue с БД (только для админов)"""
     user_id = update.message.from_user.id
-    
+
     # Проверяем, является ли пользователь админом
     admin_ids = [146679674]
     if user_id not in admin_ids:
         await update.message.reply_text("❌ У вас нет прав для выполнения этой команды.")
         return
-    
+
     try:
         await sync_job_queue_with_db(context)
         await update.message.reply_text("✅ Синхронизация job_queue с БД завершена!")
@@ -266,44 +233,45 @@ async def sync_jobs_command(update: Update, context: CallbackContext) -> None:
 async def jobs_list_command(update: Update, context: CallbackContext) -> None:
     """Команда для просмотра задач в job_queue (только для админов)"""
     user_id = update.message.from_user.id
-    
+
     # Проверяем, является ли пользователь админом
     admin_ids = [146679674]
     if user_id not in admin_ids:
         await update.message.reply_text("❌ У вас нет прав для выполнения этой команды.")
         return
-    
+
     try:
         jobs = context.job_queue.jobs()
-        
+
         if not jobs:
             await update.message.reply_text("📋 Очередь задач пуста")
             return
-        
+
         # Фильтруем только задачи подписок
-        subscription_jobs = [job for job in jobs if job.name and (job.name.startswith("charge_") or job.name.startswith("kick_"))]
-        
+        subscription_jobs = [job for job in jobs if
+                             job.name and (job.name.startswith("charge_") or job.name.startswith("kick_"))]
+
         if not subscription_jobs:
             await update.message.reply_text("📋 Задач подписок в очереди нет")
             return
-        
+
         # Формируем сообщение с информацией о задачах
         message = "📋 Задачи в job_queue:\n\n"
-        
+
         for i, job in enumerate(subscription_jobs, 1):
             job_name = job.name or "Без имени"
             job_data = job.data or {}
-            
+
             # Извлекаем информацию из данных задачи
             user_id_job = job_data.get('user_id', 'N/A')
             subscription_id = job_data.get('subscription_id', 'N/A')
             order_id = job_data.get('order_id', 'N/A')
-            
+
             # Форматируем время выполнения
             if hasattr(job, 'next_t'):
                 from datetime import datetime, timezone
                 next_run = job.next_t
-                
+
                 # Проверяем тип next_t
                 if isinstance(next_run, (int, float)):
                     # Если это timestamp
@@ -314,29 +282,29 @@ async def jobs_list_command(update: Update, context: CallbackContext) -> None:
                         next_run = next_run.replace(tzinfo=timezone.utc)
                 else:
                     next_run = None
-                
+
                 if next_run:
                     next_run_str = next_run.strftime('%d.%m.%Y %H:%M:%S UTC')
                 else:
                     next_run_str = "Не определено"
             else:
                 next_run_str = "Не определено"
-            
+
             message += f"🔹 <b>{i}. {job_name}</b>\n"
             message += f"   👤 User ID: {user_id_job}\n"
             message += f"   📋 Subscription ID: {subscription_id}\n"
             if order_id != 'N/A':
                 message += f"   🛒 Order ID: {order_id}\n"
             message += f"   ⏰ Следующий запуск: {next_run_str}\n\n"
-        
+
         # Если сообщение слишком длинное, разбиваем на части
         if len(message) > 4096:
-            parts = [message[i:i+4096] for i in range(0, len(message), 4096)]
+            parts = [message[i:i + 4096] for i in range(0, len(message), 4096)]
             for i, part in enumerate(parts, 1):
                 await update.message.reply_text(f"{part}\n\n<b>Часть {i}/{len(parts)}</b>", parse_mode=ParseMode.HTML)
         else:
             await update.message.reply_text(message, parse_mode=ParseMode.HTML)
-            
+
     except Exception as e:
         await update.message.reply_text(f"❌ Ошибка при получении списка задач: {e}")
 
@@ -355,7 +323,7 @@ async def cancel_sub_confirm_callback(update: Update, context: CallbackContext) 
 
 async def cancel_sub_final_callback(update: Update, context: CallbackContext) -> None:
     user_id = update.callback_query.from_user.id
-    
+
     try:
         # Получаем активную подписку
         subscription = pdb.get_active_subscription(user_id)
@@ -363,16 +331,16 @@ async def cancel_sub_final_callback(update: Update, context: CallbackContext) ->
             text = "❌ Активная подписка не найдена."
             await send_or_edit_message(update, context, text)
             return
-        
+
         # Отменяем подписку
         pdb.cancel_subscription(subscription['subscription_id'])
-        
+
         # Отменяем задачи в job_queue
         cancel_subscription_jobs(context, subscription['subscription_id'], user_id)
-        
+
         text = config.bot_msg['sub']['canceled']
         await send_or_edit_message(update, context, text)
-        
+
     except Exception as e:
         logger.error(f"❌ Ошибка при отмене подписки: {e}")
         text = "❌ Произошла ошибка при отмене подписки. Попробуйте позже."
@@ -846,7 +814,6 @@ async def handle_join_request(update: Update, context: CallbackContext):
     #     await join_request.approve()
     #     return
     channel_data = config.channel_map.get(chat_id)
-    
 
     if channel_data:
         name = channel_data.get('name')
