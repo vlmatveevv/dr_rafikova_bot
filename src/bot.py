@@ -449,12 +449,16 @@ async def pay_chapter_callback_handle(update: Update, context: CallbackContext) 
 
     # Проверяем, есть ли уже активная подписка
     if pdb.has_active_subscription(user_id):
-        await query.edit_message_text(
-            "У вас уже есть активная подписка! Если хотите привязать другую карту, сначала отмените текущую подписку.",
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton(config.bot_btn['sub']['cancel'], callback_data='cancel_sub')
-            ]])
+        text = (
+            "У вас уже есть активная подписка! "
+            "Если хотите привязать другую карту, сначала отмените текущую подписку."
         )
+
+        reply_markup = InlineKeyboardMarkup([
+            [InlineKeyboardButton(config.bot_btn['sub']['cancel'], callback_data='cancel_sub')]
+        ])
+
+        await send_or_edit_message(update, context, text, reply_markup)
         return ConversationHandler.END
 
     order_code = other_func.generate_order_number()
