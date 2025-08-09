@@ -476,20 +476,8 @@ async def pay_chapter_callback_handle(update: Update, context: CallbackContext) 
 
     context.user_data['is_in_conversation'] = True
 
-    keyboard = [
-        [InlineKeyboardButton("✅ Принимаю", callback_data=f"agree_offer:{order_code}")],
-        [InlineKeyboardButton("🚫 Отмена", callback_data='cancel')]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    await send_or_edit_message(
-        update=update,
-        context=context,
-        text="📄 Я ознакомился и принимаю условия Публичной оферты.\n\n"
-             f'<a href="{config.other_cfg["links"]["offer"]}">Открыть оферту</a>',
-        reply_markup=reply_markup
-    )
-    # return AGREE_OFFER
+    # Убираем дублирование - передаем управление в start_payment_handle
+    # который сам покажет сообщение с офертой
     return await start_payment_handle(update, context, [course_key])
 
 
