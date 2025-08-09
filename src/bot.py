@@ -193,7 +193,7 @@ async def support_callback_handle(update: Update, context: CallbackContext) -> N
 
 
 async def cancel_sub_command(update: Update, context: CallbackContext) -> None:
-    user_id = update.message.from_user.id
+    user_id = update.effective_user.id
 
     # Проверяем, есть ли активная подписка
     if not pdb.has_active_subscription(user_id):
@@ -361,11 +361,10 @@ async def cancel_sub_menu_callback(update: Update, context: CallbackContext) -> 
 async def main_menu_callback_handle(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
     await query.answer()
-    await send_or_edit_message(
-        update=update,
-        context=context,
+    await query.edit_message_text(
         text="📲 Главное меню",
-        reply_markup=my_keyboard.main_menu_items_button_markup()
+        reply_markup=my_keyboard.main_menu_items_button_markup(),
+        parse_mode=ParseMode.HTML
     )
 
 
@@ -401,11 +400,7 @@ async def buy_chapter_callback_handle(update: Update, context: CallbackContext) 
     course = config.courses.get(course_key)
 
     if not course:
-        await send_or_edit_message(
-            update=update,
-            context=context,
-            text="Курс не найден."
-        )
+        await query.edit_message_text("Курс не найден.")
         return
 
     text = config.bot_msg['buy_chapter_info'].format(
@@ -430,11 +425,11 @@ async def buy_chapter_callback_handle(update: Update, context: CallbackContext) 
     ])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await send_or_edit_message(
-        update=update,
-        context=context,
+    await query.edit_message_text(
         text=text,
-        reply_markup=reply_markup
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.HTML,
+        disable_web_page_preview=True
     )
 
 
@@ -449,19 +444,13 @@ async def pay_chapter_callback_handle(update: Update, context: CallbackContext) 
     course = config.courses.get(course_key)
 
     if not course:
-        await send_or_edit_message(
-            update=update,
-            context=context,
-            text="Курс не найден."
-        )
+        await query.edit_message_text("Курс не найден.")
         return ConversationHandler.END
 
     # Проверяем, есть ли уже активная подписка
     if pdb.has_active_subscription(user_id):
-        await send_or_edit_message(
-            update=update,
-            context=context,
-            text="У вас уже есть активная подписка! Если хотите привязать другую карту, сначала отмените текущую подписку.",
+        await query.edit_message_text(
+            "У вас уже есть активная подписка! Если хотите привязать другую карту, сначала отмените текущую подписку.",
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton(config.bot_btn['sub']['cancel'], callback_data='cancel_sub')
             ]])
@@ -476,8 +465,20 @@ async def pay_chapter_callback_handle(update: Update, context: CallbackContext) 
 
     context.user_data['is_in_conversation'] = True
 
-    # Убираем дублирование - передаем управление в start_payment_handle
-    # который сам покажет сообщение с офертой
+    keyboard = [
+        [InlineKeyboardButton("✅ Принимаю", callback_data=f"agree_offer:{order_code}")],
+        [InlineKeyboardButton("�� Отмена", callback_data='cancel')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await query.edit_message_text(
+        text="📄 Я ознакомился и принимаю условия Публичной оферты.\n\n"
+             f'<a href="{config.other_cfg["links"]["offer"]}">Открыть оферту</a>',
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.HTML,
+        disable_web_page_preview=True
+    )
+    # return AGREE_OFFER
     return await start_payment_handle(update, context, [course_key])
 
 
@@ -489,11 +490,7 @@ async def confirm_multi_buy_handle(update: Update, context: CallbackContext) -> 
     user_id = query.from_user.id
 
     if not selected_courses:
-        await send_or_edit_message(
-            update=update,
-            context=context,
-            text="❗️Вы не выбрали ни одного курса."
-        )
+        await query.edit_message_text("❗️Вы не выбрали ни одного курса.")
         return ConversationHandler.END
 
     context.user_data['is_in_conversation'] = True
@@ -522,12 +519,12 @@ async def start_payment_handle(update: Update, context: CallbackContext, selecte
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    await send_or_edit_message(
-        update=update,
-        context=context,
+    await query.edit_message_text(
         text="📄 Я ознакомился и принимаю условия Публичной оферты.\n\n"
              f'<a href="{config.other_cfg["links"]["offer"]}">Открыть оферту</a>',
-        reply_markup=reply_markup
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.HTML,
+        disable_web_page_preview=True
     )
     return AGREE_OFFER
 
@@ -544,12 +541,12 @@ async def handle_offer_agree(update: Update, context: CallbackContext) -> int:
                 [InlineKeyboardButton("🚫 Отмена", callback_data='cancel')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    await send_or_edit_message(
-        update=update,
-        context=context,
+    await query.edit_message_text(
         text='🔐 Я даю согласие на обработку моих персональных данных.\n\n'
              f'<a href="{config.other_cfg["links"]["privacy"]}">Политика обработки данных</a>',
-        reply_markup=reply_markup
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.HTML,
+        disable_web_page_preview=True
     )
     return AGREE_PRIVACY
 
@@ -568,12 +565,12 @@ async def handle_privacy_agree(update: Update, context: CallbackContext) -> int:
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    await send_or_edit_message(
-        update=update,
-        context=context,
+    await query.edit_message_text(
         text="📬 Я даю согласие на получение рекламной и информационной рассылки.\n\n"
              f'<a href="{config.other_cfg["links"]["consent"]}">Документ о рассылке</a>',
-        reply_markup=reply_markup
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.HTML,
+        disable_web_page_preview=True
     )
     return AGREE_NEWSLETTER
 
@@ -592,12 +589,8 @@ async def handle_newsletter_agree(update: Update, context: CallbackContext) -> i
         [InlineKeyboardButton("🚫 Отмена", callback_data='cancel')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    email_msg = await send_or_edit_message(
-        update=update,
-        context=context,
-        text="📧 Введите ваш e-mail для отправки чека:",
-        reply_markup=reply_markup
-    )
+    email_msg = await query.edit_message_text(text="📧 Введите ваш e-mail для отправки чека:",
+                                              reply_markup=reply_markup)
     pdb.update_agreed_newsletter(order_code, agreement_newsletter_bool)
 
     context.user_data['email_msg'] = email_msg
@@ -692,12 +685,8 @@ async def cancel_payment_handle(update: Update, context: CallbackContext) -> int
         [InlineKeyboardButton("📲 Главное меню", callback_data='main_menu')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await send_or_edit_message(
-        update=update,
-        context=context,
-        text="Покупка отменена. Возвращайтесь позже.",
-        reply_markup=reply_markup
-    )
+    await query.edit_message_text(text="Покупка отменена. Возвращайтесь позже.",
+                                  reply_markup=reply_markup)
     return ConversationHandler.END
 
 
@@ -725,11 +714,10 @@ async def buy_multiply_callback_handle(update: Update, context: CallbackContext)
         reply_markup = InlineKeyboardMarkup(keyboard)
         text = "Выберите курсы, которые хотите купить. Нажмите ещё раз, чтобы снять выбор."
 
-    await send_or_edit_message(
-        update=update,
-        context=context,
+    await query.edit_message_text(
         text=text,
-        reply_markup=reply_markup
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.HTML
     )
 
 
@@ -761,11 +749,10 @@ async def toggle_multi_buy_chapter(update: Update, context: CallbackContext) -> 
     keyboard.extend(my_keyboard.main_menu_button_markup())
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    await send_or_edit_message(
-        update=update,
-        context=context,
+    await query.edit_message_text(
         text="Выберите курсы, которые хотите купить. Нажмите ещё раз, чтобы снять выбор.",
-        reply_markup=reply_markup
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.HTML
     )
 
 
@@ -802,16 +789,15 @@ async def upd_payment_url_handle(update: Update, context: CallbackContext) -> No
         [InlineKeyboardButton("✅ Подтвердить и оплатить", url=payment_url)]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    payment_message = await send_or_edit_message(
-        update=update,
-        context=context,
+    payment_message = await query.edit_message_text(
         text=config.bot_msg['confirm_purchase'].format(
             email=email,
             name=course['name'] + course['emoji'],
             num=course_key,
             price=course['price'],
         ),
-        reply_markup=reply_markup
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.HTML
     )
 
     payment_message_id = payment_message.message_id
@@ -880,27 +866,18 @@ async def grant_manual_access_handle(update: Update, context: CallbackContext):
     # Добавим доступ в manual_access
     try:
         pdb.grant_manual_access(user_id=user_id, granted_by=admin_id)
-        await send_or_edit_message(
-            update=update,
-            context=context,
-            text=f"✅ Доступ пользователю {user_id} к курсу {name} успешно выдан. Теперь ему нужно заново перейти в канал.")
+        await query.edit_message_text(
+            f"✅ Доступ пользователю {user_id} к курсу {name} успешно выдан. Теперь ему нужно заново перейти в канал.")
     except Exception as e:
         logger.error(f"❌ Ошибка выдачи доступа: {e}")
-        await send_or_edit_message(
-            update=update,
-            context=context,
-            text="❌ Ошибка при попытке выдать доступ.")
+        await query.edit_message_text("❌ Ошибка при попытке выдать доступ.")
 
 
 async def deny_manual_access(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()
     _, user_id_str, course_key = query.data.split(":")
-    await send_or_edit_message(
-        update=update,
-        context=context,
-        text=f"⛔️ Вы отказали в доступе пользователю {user_id_str} к курсу."
-    )
+    await query.edit_message_text(f"⛔️ Вы отказали в доступе пользователю {user_id_str} к курсу.")
 
 
 async def go_back_callback_handle(update: Update, context: CallbackContext) -> None:
