@@ -26,14 +26,14 @@ def handle_message_not_modified(func):
 async def send_or_edit_message(update: Update, context: CallbackContext, text: str,
                                reply_markup: InlineKeyboardMarkup = None, new_message=False):
     if new_message:
-        await context.bot.send_message(
+        message = await context.bot.send_message(
             chat_id=update.effective_user.id,
             text=text,
             reply_markup=reply_markup,
             parse_mode=ParseMode.HTML,
             disable_web_page_preview=True
         )
-        return
+        return message
 
     if update.callback_query:
         if update.callback_query.message.text:
@@ -44,39 +44,43 @@ async def send_or_edit_message(update: Update, context: CallbackContext, text: s
                     parse_mode=ParseMode.HTML,
                     disable_web_page_preview=True
                 )
+                return update.callback_query.message
             except Exception:
                 # Попытка удалить сообщение, если редактирование не удалось
                 try:
                     await update.callback_query.message.delete()
                 except Exception:
                     pass  # Просто игнорируем, если удалить нельзя
-                await context.bot.send_message(
+                message = await context.bot.send_message(
                     chat_id=update.effective_user.id,
                     text=text,
                     reply_markup=reply_markup,
                     parse_mode=ParseMode.HTML,
                     disable_web_page_preview=True
                 )
+                return message
         else:
             try:
                 await update.callback_query.message.delete()
             except Exception:
                 pass  # Если не удалось удалить, продолжаем
-            await context.bot.send_message(
+            message = await context.bot.send_message(
                 chat_id=update.effective_user.id,
                 text=text,
                 reply_markup=reply_markup,
                 parse_mode=ParseMode.HTML,
                 disable_web_page_preview=True
             )
+            return message
     else:
-        await context.bot.send_message(
+        message = await context.bot.send_message(
             chat_id=update.effective_user.id,
             text=text,
             reply_markup=reply_markup,
             parse_mode=ParseMode.HTML,
             disable_web_page_preview=True
         )
+        return message
 
 
 async def send_or_edit_photo(update: Update, context: CallbackContext, photo, caption: str = "",
