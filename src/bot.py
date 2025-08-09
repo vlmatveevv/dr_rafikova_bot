@@ -471,13 +471,11 @@ async def pay_chapter_callback_handle(update: Update, context: CallbackContext) 
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    await query.edit_message_text(
-        text="📄 Я ознакомился и принимаю условия Публичной оферты.\n\n"
-             f'<a href="{config.other_cfg["links"]["offer"]}">Открыть оферту</a>',
-        reply_markup=reply_markup,
-        parse_mode=ParseMode.HTML,
-        disable_web_page_preview=True
+    text = (
+        "📄 Я ознакомился и принимаю условия Публичной оферты.\n\n"
+        f'<a href="{config.other_cfg["links"]["offer"]}">Открыть оферту</a>'
     )
+    await send_or_edit_message(update, context, text, reply_markup)
     # return AGREE_OFFER
     return await start_payment_handle(update, context, [course_key])
 
