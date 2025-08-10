@@ -108,11 +108,18 @@ async def register(update: Update, context: CallbackContext) -> int:
     caption = f"{config.bot_msg['hello'].format(first_name=first_name)}"
     video_path = config.media_dir / "video.mp4"
     
-    with open(video_path, 'rb') as video:
-        await context.bot.send_video_note(
-            chat_id=user_id,
-            video_note=video
-        )
+    try:
+        with open(video_path, 'rb') as video:
+            await context.bot.send_video_note(
+                chat_id=user_id,
+                video_note=video
+            )
+    except telegram.error.BadRequest as e:
+        logger.info(f"Ошибка при отправке video note: {e}")
+        pass
+    
+    # Задержка 3 секунды перед отправкой текста
+    await asyncio.sleep(3)
     
     await send_or_edit_message(update, context, caption, reply_markup)
     
@@ -475,18 +482,7 @@ async def pay_chapter_callback_handle(update: Update, context: CallbackContext) 
 
     context.user_data['is_in_conversation'] = True
 
-    keyboard = [
-        [InlineKeyboardButton("✅ Принимаю", callback_data=f"agree_offer:{order_code}")],
-        [InlineKeyboardButton("🚫Отмена", callback_data='cancel')]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    text = (
-        "📄 Я ознакомился и принимаю условия Публичной оферты.\n\n"
-        f'<a href="{config.other_cfg["links"]["offer"]}">Открыть оферту</a>'
-    )
-    await send_or_edit_message(update, context, text, reply_markup)
-    # return AGREE_OFFER
+    # Убираем дублирование - сообщение будет отправлено в start_payment_handle
     return await start_payment_handle(update, context, [course_key])
 
 
@@ -529,6 +525,8 @@ async def start_payment_handle(update: Update, context: CallbackContext, selecte
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     text = (
+        "💳 Подписка оформляется на 1 месяц с автоматическим продлением.\n"
+        "Ты можешь отменить её в любой момент.\n\n"
         "📄 Я ознакомился и принимаю условия Публичной оферты.\n\n"
         f'<a href="{config.other_cfg["links"]["offer"]}">Открыть оферту</a>'
     )
