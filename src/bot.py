@@ -101,10 +101,21 @@ async def register(update: Update, context: CallbackContext) -> int:
     #     reply_markup=reply_markup,
     #     parse_mode=ParseMode.HTML
     caption = f"{config.bot_msg['hello'].format(first_name=first_name)}"
-    avatar_img_path = config.media_dir / "avatar.jpg"
-    with open(avatar_img_path, 'rb') as photo:
-        await send_or_edit_photo(update, context, photo, caption, reply_markup)
+    # avatar_img_path = config.media_dir / "avatar.jpg"
+    # with open(avatar_img_path, 'rb') as photo:
+    #     await send_or_edit_photo(update, context, photo, caption, reply_markup)
 
+    caption = f"{config.bot_msg['hello'].format(first_name=first_name)}"
+    video_path = config.media_dir / "video.mp4"
+    
+    with open(video_path, 'rb') as video:
+        await context.bot.send_video_note(
+            chat_id=user_id,
+            video_note=video
+        )
+    
+    await send_or_edit_message(update, context, caption, reply_markup)
+    
     return ConversationHandler.END
 
 
