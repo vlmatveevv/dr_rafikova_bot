@@ -49,6 +49,7 @@ async def yookassa_webhook(request: Request, background_tasks: BackgroundTasks):
     course = config.courses.get(chapter)
 
     channel_invite_url = course['channel_invite_link']
+    group_invite_url = course.get('group_invite_link')
     channel_name = course['name']
 
     pdb.add_payment(external_payment_id=payment_id, amount=amount, income_amount=income_amount,
@@ -56,6 +57,7 @@ async def yookassa_webhook(request: Request, background_tasks: BackgroundTasks):
 
     keyboard = [
         [InlineKeyboardButton("Вступить в канал ✅", url=channel_invite_url)],
+        [InlineKeyboardButton("👥 Вступить в группу", url=group_invite_url)]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -110,7 +112,7 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
 
         # Проверяем, есть ли уже подписка для этого заказа
         existing_subscription = pdb.get_active_subscription(user_id)
-        
+
         if existing_subscription:
             # Это повторный платеж - продлеваем подписку
             subscription_type = "renewal"
@@ -118,12 +120,12 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
                 pdb.extend_subscription(existing_subscription['subscription_id'])
                 logger.info(f"✅ Подписка {existing_subscription['subscription_id']} продлена")
                 logger.info(f"✅ Задача на повторное списание будет добавлена при следующей синхронизации")
-                
+
                 # Отменяем kick задачи для этой подписки
                 # К сожалению, у нас нет доступа к context в webhook
                 # Kick задачи будут отменены при проверке в kick_subscription_job
                 logger.info(f"✅ Kick задачи будут отменены при следующей проверке")
-                
+
             except Exception as e:
                 logger.error(f"❌ Ошибка при продлении подписки: {e}")
                 return "OK"
@@ -134,7 +136,7 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
                 subscription_id = pdb.create_subscription(user_id, order_id)
                 logger.info(f"✅ Создана подписка {subscription_id} для пользователя {user_id}")
                 logger.info(f"✅ Задача на повторное списание будет добавлена при следующей синхронизации")
-                
+
             except Exception as e:
                 logger.error(f"❌ Ошибка при создании подписки: {e}")
                 return "OK"
@@ -148,10 +150,11 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
         course_names = [course["name"]]
         channel_name = course["name"]
         channel_invite_url = course["channel_invite_link"]
+        group_invite_url = course.get("group_invite_link")
 
         keyboard = [
             [InlineKeyboardButton("Вступить в канал ✅", url=channel_invite_url)],
-            [InlineKeyboardButton("Вступить в чат ✅", url=group_invite_url)]
+            [InlineKeyboardButton("Вступить в группу ✅", url=group_invite_url)]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 

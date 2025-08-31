@@ -4,6 +4,7 @@ from psycopg2 import sql
 from psycopg2.extras import RealDictCursor, execute_values
 import config
 import logging
+from other_func import add_one_month_safe
 from datetime import datetime, timedelta
 
 # Настройка логгера
@@ -490,59 +491,104 @@ class Database:
 
     # ===== ФУНКЦИИ ДЛЯ ПОДПИСОК =====
 
+    # def create_subscription(self, user_id: int, order_id: int) -> int:
+    #     """
+    #     Создает новую подписку.
+    #
+    #     :param user_id: Telegram user ID
+    #     :param order_id: ID заказа
+    #     :return: subscription_id
+    #     """
+    #     try:
+    #         with self.conn.cursor() as cursor:
+    #             # Проверяем, есть ли отмененная подписка
+    #             cancelled_subscription = self.get_cancelled_subscription(user_id)
+    #
+    #             if cancelled_subscription:
+    #                 # Новая подписка начинается с даты истечения старой
+    #                 start_date = cancelled_subscription['end_date']
+    #                 # Вычисляем дату следующего платежа (то же число следующего месяца)
+    #                 if start_date.month == 12:
+    #                     # Если декабрь, то следующий месяц - январь следующего года
+    #                     next_payment_date = start_date.replace(year=start_date.year + 1, month=1)
+    #                 else:
+    #                     # Иначе просто увеличиваем месяц
+    #                     next_payment_date = start_date.replace(month=start_date.month + 1)
+    #
+    #                 # Устанавливаем даты: начало с даты истечения старой подписки, конец через месяц
+    #                 query = """
+    #                     INSERT INTO subscriptions (user_id, order_id, start_date, end_date, next_payment_date)
+    #                     VALUES (%s, %s, %s, %s + INTERVAL '1 month', %s)
+    #                     RETURNING subscription_id;
+    #                 """
+    #                 cursor.execute(query, (user_id, order_id, start_date, start_date, next_payment_date))
+    #             else:
+    #                 # Обычная логика создания подписки
+    #                 # Вычисляем дату следующего платежа (то же число следующего месяца)
+    #                 now = datetime.now()
+    #                 if now.month == 12:
+    #                     # Если декабрь, то следующий месяц - январь следующего года
+    #                     next_payment_date = now.replace(year=now.year + 1, month=1)
+    #                 else:
+    #                     # Иначе просто увеличиваем месяц
+    #                     next_payment_date = now.replace(month=now.month + 1)
+    #
+    #                 # Устанавливаем даты: начало сейчас, конец через месяц
+    #                 query = """
+    #                     INSERT INTO subscriptions (user_id, order_id, start_date, end_date, next_payment_date)
+    #                     VALUES (%s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '1 month', %s)
+    #                     RETURNING subscription_id;
+    #                 """
+    #                 cursor.execute(query, (user_id, order_id, next_payment_date))
+    #
+    #             subscription_id = cursor.fetchone()[0]
+    #             self.conn.commit()
+    #             return subscription_id
+    #     except Exception as e:
+    #         print(f"❌ Ошибка при создании подписки: {e}")
+    #         self.conn.rollback()
+    #         raise
+
     def create_subscription(self, user_id: int, order_id: int) -> int:
         """
         Создает новую подписку.
-        
+
         :param user_id: Telegram user ID
         :param order_id: ID заказа
         :return: subscription_id
         """
         try:
             with self.conn.cursor() as cursor:
-                # Проверяем, есть ли отмененная подписка
                 cancelled_subscription = self.get_cancelled_subscription(user_id)
-                
+
                 if cancelled_subscription:
                     # Новая подписка начинается с даты истечения старой
                     start_date = cancelled_subscription['end_date']
-                    # Вычисляем дату следующего платежа (то же число следующего месяца)
-                    if start_date.month == 12:
-                        # Если декабрь, то следующий месяц - январь следующего года
-                        next_payment_date = start_date.replace(year=start_date.year + 1, month=1)
-                    else:
-                        # Иначе просто увеличиваем месяц
-                        next_payment_date = start_date.replace(month=start_date.month + 1)
-                    
-                    # Устанавливаем даты: начало с даты истечения старой подписки, конец через месяц
+                    end_date = add_one_month_safe(start_date)
+                    next_payment_date = end_date
+
                     query = """
                         INSERT INTO subscriptions (user_id, order_id, start_date, end_date, next_payment_date)
-                        VALUES (%s, %s, %s, %s + INTERVAL '1 month', %s)
+                        VALUES (%s, %s, %s, %s, %s)
                         RETURNING subscription_id;
                     """
-                    cursor.execute(query, (user_id, order_id, start_date, start_date, next_payment_date))
+                    cursor.execute(query, (user_id, order_id, start_date, end_date, next_payment_date))
                 else:
-                    # Обычная логика создания подписки
-                    # Вычисляем дату следующего платежа (то же число следующего месяца)
                     now = datetime.now()
-                    if now.month == 12:
-                        # Если декабрь, то следующий месяц - январь следующего года
-                        next_payment_date = now.replace(year=now.year + 1, month=1)
-                    else:
-                        # Иначе просто увеличиваем месяц
-                        next_payment_date = now.replace(month=now.month + 1)
-                    
-                    # Устанавливаем даты: начало сейчас, конец через месяц
+                    end_date = add_one_month_safe(now)
+                    next_payment_date = end_date
+
                     query = """
                         INSERT INTO subscriptions (user_id, order_id, start_date, end_date, next_payment_date)
-                        VALUES (%s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '1 month', %s)
+                        VALUES (%s, %s, %s, %s, %s)
                         RETURNING subscription_id;
                     """
-                    cursor.execute(query, (user_id, order_id, next_payment_date))
-                
+                    cursor.execute(query, (user_id, order_id, now, end_date, next_payment_date))
+
                 subscription_id = cursor.fetchone()[0]
                 self.conn.commit()
                 return subscription_id
+
         except Exception as e:
             print(f"❌ Ошибка при создании подписки: {e}")
             self.conn.rollback()
