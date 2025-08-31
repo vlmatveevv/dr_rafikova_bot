@@ -57,7 +57,7 @@ async def yookassa_webhook(request: Request, background_tasks: BackgroundTasks):
 
     keyboard = [
         [InlineKeyboardButton("Вступить в канал ✅", url=channel_invite_url)],
-        [InlineKeyboardButton("👥 Вступить в группу", url=group_invite_url)]
+        [InlineKeyboardButton("Вступить в группу ✅", url=group_invite_url)]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
