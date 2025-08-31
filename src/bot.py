@@ -237,7 +237,8 @@ async def zxc_command(update: Update, context: CallbackContext) -> None:
         chat_id=group_id,
         user_id=user_id
     )
-    
+    subscription = pdb.get_active_subscription(user_id)
+    pdb.cancel_subscription(subscription['subscription_id'])
     # Сразу снимаем бан, чтобы пользователь мог вернуться в будущем
     await context.bot.unban_chat_member(
         chat_id=group_id,
