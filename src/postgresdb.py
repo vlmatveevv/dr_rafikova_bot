@@ -4,12 +4,25 @@ from psycopg2 import sql
 from psycopg2.extras import RealDictCursor, execute_values
 import config
 import logging
-from other_func import add_one_month_safe
 from datetime import datetime, timedelta
+import calendar
 
 # Настройка логгера
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def add_one_month_safe(dt: datetime) -> datetime:
+    # считаем следующий месяц/год
+    if dt.month == 12:
+        year, month = dt.year + 1, 1
+    else:
+        year, month = dt.year, dt.month + 1
+    # последний день следующего месяца
+    last_day = calendar.monthrange(year, month)[1]
+    # если, например, было 31, а в след. месяце 30 — ставим 30
+    day = min(dt.day, last_day)
+    return dt.replace(year=year, month=month, day=day)
 
 
 class Database:
