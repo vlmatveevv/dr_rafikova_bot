@@ -107,7 +107,7 @@ async def register(update: Update, context: CallbackContext) -> int:
 
     caption = f"{config.bot_msg['hello'].format(first_name=first_name)}"
     video_path = config.media_dir / "video.mp4"
-
+    
     try:
         with open(video_path, 'rb') as video:
             await context.bot.send_video_note(
@@ -117,12 +117,12 @@ async def register(update: Update, context: CallbackContext) -> int:
     except telegram.error.BadRequest as e:
         logger.info(f"Ошибка при отправке video note: {e}")
         pass
-
+    
     # Задержка 3 секунды перед отправкой текста
     await asyncio.sleep(3)
-
+    
     await send_or_edit_message(update, context, caption, reply_markup)
-
+    
     return ConversationHandler.END
 
 
@@ -798,9 +798,6 @@ async def handle_join_request(update: Update, context: CallbackContext):
     join_request = update.chat_join_request
     user_id = join_request.from_user.id
     chat_id = update.chat_join_request.chat.id
-
-    logger.info(f"🔄 Получен запрос на вступление от пользователя {user_id} в чат {chat_id}")
-
     # if user_id == 7768888247:
     #     user_id = 146679674
     # if user_id == 146679674:
@@ -808,12 +805,9 @@ async def handle_join_request(update: Update, context: CallbackContext):
     #     return
     channel_data = config.channel_map.get(chat_id)
 
-    logger.info(f"📊 channel_data для {chat_id}: {channel_data}")
-
     if channel_data:
         name = channel_data.get('name')
         channel_invite_link = channel_data.get('channel_invite_link')
-        group_invite_link = channel_data.get('group_invite_link')
     else:
         return
 
@@ -826,7 +820,6 @@ async def handle_join_request(update: Update, context: CallbackContext):
         await join_request.approve()
         keyboard = [
             [InlineKeyboardButton("✅ Перейти в канал", url=channel_invite_link)],
-            [InlineKeyboardButton("✅ Вступить в группу", url=group_invite_link)]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await context.bot.send_message(
