@@ -6,7 +6,7 @@ import traceback
 import html
 import re
 import time as time_new
-from datetime import time, datetime, timedelta
+from datetime import time, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytz
@@ -228,6 +228,15 @@ async def cancel_sub_command(update: Update, context: CallbackContext) -> None:
 
 
 async def zxc_command(update: Update, context: CallbackContext) -> None:
+    group_id = config.courses.get('course', {}).get('group_id')
+    await update.message.reply_text(group_id)
+    user_id = 7768888247
+    await context.bot.ban_chat_member(
+        chat_id=group_id,
+        user_id=user_id,
+        until_date=datetime.now(timezone.utc) + timedelta(seconds=1)  # Бан на 1 секунду
+    )
+
     await sync_job_queue_with_db(context)
 
 
