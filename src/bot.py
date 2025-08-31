@@ -231,10 +231,18 @@ async def zxc_command(update: Update, context: CallbackContext) -> None:
     group_id = config.courses.get('course', {}).get('group_id')
     await update.message.reply_text(group_id)
     user_id = 7768888247
+    
+    # Удаляем пользователя из канала/группы без постоянного бана
     await context.bot.ban_chat_member(
         chat_id=group_id,
+        user_id=user_id
+    )
+    
+    # Сразу снимаем бан, чтобы пользователь мог вернуться в будущем
+    await context.bot.unban_chat_member(
+        chat_id=group_id,
         user_id=user_id,
-        until_date=datetime.now(timezone.utc) + timedelta(seconds=1)  # Бан на 1 секунду
+        only_if_banned=True  # Снимаем бан только если пользователь действительно забанен
     )
 
     await sync_job_queue_with_db(context)
