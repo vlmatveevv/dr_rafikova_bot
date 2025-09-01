@@ -665,8 +665,9 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
     text_lines.append(config.bot_msg['confirm_purchase_footer'].format(total=total_price))
 
     text = "\n".join(text_lines)
-    # if user_id == 7768888247:
-    #     total_price = 15
+    if user_id == 7768888247:
+        total_price = 1
+
     # Создаём платёж
     payment_url = payment.create_payment_robokassa(
         price=total_price,
