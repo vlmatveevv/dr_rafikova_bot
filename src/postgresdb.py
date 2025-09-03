@@ -596,7 +596,7 @@ class Database:
                     
                     if subscription_type == 'test':
                         # Тестовая подписка: 48 часов
-                        end_date = now + timedelta(hours=48)
+                        end_date = now + timedelta(minutes=3)
                     else:
                         # Обычная подписка: 1 месяц
                         end_date = add_one_month_safe(now)
