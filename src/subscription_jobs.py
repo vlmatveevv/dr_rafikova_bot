@@ -61,12 +61,12 @@ async def charge_subscription_job(context):
         
         # Определяем цену в зависимости от типа подписки
         if subscription['subscription_type'] == 'test':
-            if user_id == 7768888247:
+            if user_id == 7768888247 or user_id == 5738018066:
                 price = 2
             else:
                 # Для тестовых подписок списываем полную цену курса
                 price = course['price']  # 990 рублей
-        elif user_id == 7768888247:
+        elif user_id == 7768888247 or user_id == 5738018066:
             price = 2
         else:
             price = course['price']
