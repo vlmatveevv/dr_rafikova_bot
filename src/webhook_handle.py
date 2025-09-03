@@ -90,14 +90,6 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
         subscription_type_param = data.get("shp_subscription_type", "regular")
         
         # Дополнительная проверка: если сумма 1 рубль, то это точно тестовая подписка
-        if out_sum == 1.0:
-            subscription_type_param = "test"
-            logger.info(f"🔍 Определена тестовая подписка по сумме платежа: {out_sum} рубль")
-        elif out_sum == 990.0:
-            subscription_type_param = "regular"
-            logger.info(f"🔍 Определена обычная подписка по сумме платежа: {out_sum} рублей")
-        else:
-            logger.info(f"🔍 Сумма платежа: {out_sum} рублей, тип подписки из параметров: {subscription_type_param}")
 
         # Проверка: уже обработан?
         if pdb.payment_exists_by_order_code(inv_id):
@@ -147,23 +139,9 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
             subscription_type = "new_sub"
             try:
                 if subscription_type_param == "test":
-                    # Дополнительная проверка суммы для тестовой подписки
-                    if out_sum != 1.0:
-                        logger.error(f"❌ Несоответствие: тестовая подписка, но сумма {out_sum} рублей (должна быть 1 рубль)")
-                        return "OK"
-                    
-                    # Проверяем, может ли пользователь создать тестовую подписку
-                    if not pdb.can_create_test_subscription(user_id):
-                        logger.error(f"❌ Пользователь {user_id} не может создать тестовую подписку (уже были подписки)")
-                        return "OK"
-                    
                     subscription_id = pdb.create_test_subscription(user_id, order_id)
-                    logger.info(f"✅ Создана тестовая подписка {subscription_id} для пользователя {user_id}")
+                    logger.info(f"✅ Создана пробная подписка {subscription_id} для пользователя {user_id}")
                 else:
-                    # Дополнительная проверка суммы для обычной подписки
-                    if out_sum != 990.0:
-                        logger.warning(f"⚠️ Необычная сумма для обычной подписки: {out_sum} рублей (ожидалось 990 рублей)")
-                    
                     subscription_id = pdb.create_subscription(user_id, order_id)
                     logger.info(f"✅ Создана обычная подписка {subscription_id} для пользователя {user_id}")
                 
