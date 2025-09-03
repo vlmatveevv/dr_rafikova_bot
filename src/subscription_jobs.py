@@ -58,8 +58,13 @@ async def charge_subscription_job(context):
 
         # Создаем повторный платеж с новым заказом
         course = config.courses.get('course')
-        if user_id == 7768888247:
-            price = 15
+        
+        # Определяем цену в зависимости от типа подписки
+        if subscription['subscription_type'] == 'test':
+            # Для тестовых подписок списываем полную цену курса
+            price = course['price']  # 990 рублей
+        elif user_id == 7768888247:
+            price = 2
         else:
             price = course['price']
 
@@ -317,17 +322,30 @@ def schedule_subscription_jobs(context, user_id: int, subscription_id: int):
         # Сбрасываем счетчик попыток списания при создании новой подписки
         pdb.reset_charge_attempts(subscription_id)
 
-        # Вычисляем дату следующего платежа (то же число следующего месяца)
-        now = datetime.now(timezone.utc)
-        if now.month == 12:
-            # Если декабрь, то следующий месяц - январь следующего года
-            next_month = now.replace(year=now.year + 1, month=1)
-        else:
-            # Иначе просто увеличиваем месяц
-            next_month = now.replace(month=now.month + 1)
+        # Получаем данные подписки для определения типа
+        subscription = pdb.get_subscription_by_id(subscription_id)
+        if not subscription:
+            logger.error(f"❌ Подписка {subscription_id} не найдена")
+            return
 
-        # Вычисляем время до следующего платежа
-        time_until_payment = next_month - now
+        # Вычисляем дату следующего платежа в зависимости от типа подписки
+        now = datetime.now(timezone.utc)
+        
+        if subscription['subscription_type'] == 'test':
+            # Для тестовых подписок - через 48 часов
+            next_payment_date = now + timedelta(hours=48)
+            time_until_payment = timedelta(hours=48)
+            logger.info(f"📅 Тестовая подписка {subscription_id}: следующий платеж через 48 часов")
+        else:
+            # Для обычных подписок - через месяц
+            if now.month == 12:
+                # Если декабрь, то следующий месяц - январь следующего года
+                next_payment_date = now.replace(year=now.year + 1, month=1)
+            else:
+                # Иначе просто увеличиваем месяц
+                next_payment_date = now.replace(month=now.month + 1)
+            time_until_payment = next_payment_date - now
+            logger.info(f"📅 Обычная подписка {subscription_id}: следующий платеж через месяц")
 
         # Задача на повторное списание
         charge_job_name = f"charge_{subscription_id}_{user_id}"
@@ -342,8 +360,8 @@ def schedule_subscription_jobs(context, user_id: int, subscription_id: int):
 
         # Дублируем в БД для резерва
         try:
-            db_job_id = pdb.schedule_job(user_id, subscription_id, 'charge', next_month)
-            logger.info(f"✅ Создана задача {charge_job_name} (БД ID: {db_job_id}) на {next_month.strftime('%d.%m.%Y')}")
+            db_job_id = pdb.schedule_job(user_id, subscription_id, 'charge', next_payment_date)
+            logger.info(f"✅ Создана задача {charge_job_name} (БД ID: {db_job_id}) на {next_payment_date.strftime('%d.%m.%Y %H:%M')}")
         except Exception as e:
             logger.error(f"❌ Ошибка при создании задачи в БД: {e}")
 

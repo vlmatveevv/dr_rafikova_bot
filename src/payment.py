@@ -198,3 +198,47 @@ async def charge_monthly_subscription():
         logger.error(f"Monthly subscription charge failed for user: {e}")
         # Здесь можно добавить логику уведомления пользователя об ошибке
         raise e
+
+
+def create_test_payment_robokassa(email, order_code, order_id, user_id):
+    """
+    Создает тестовый платеж за 1 рубль через Robokassa
+    
+    Args:
+        email: Email пользователя
+        order_code: Код заказа
+        order_id: ID заказа
+        user_id: ID пользователя
+    """
+    test_price = config.courses['course']['test_price']
+    
+    # Данные для чека
+    items = [{
+        "Name": "Тестовая подписка",
+        "Quantity": 1,
+        "Sum": test_price,
+        "PaymentMethod": "full_prepayment",
+        "PaymentObject": "service",
+        "Tax": "none"
+    }]
+
+    # Описание для платёжной ссылки
+    description = f"Тестовый доступ к курсу на 2 дня. #n{order_code}"
+
+    receipt = {"items": items}
+
+    response = robokassa.generate_open_payment_link(
+        merchant_comments="test subscription",
+        description=description,
+        invoice_type=InvoiceType.ONE_TIME,
+        email=email,
+        receipt=receipt,
+        inv_id=order_code,
+        out_sum=test_price,
+        user_id=user_id,
+        recurring=True,  # Включаем рекуррентные платежи для последующего списания 990 рублей
+        shp_subscription_type="test",  # Указываем тип подписки
+        shp_order_id=order_id
+    )
+    logger.info(f"Test payment link created: {response}")
+    return response.url

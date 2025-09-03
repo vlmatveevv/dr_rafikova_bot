@@ -15,3 +15,11 @@ ALTER TABLE payments ADD CONSTRAINT payments_order_id_fkey
 
 -- Исправление таблицы manual_access - изменение типа created_at
 ALTER TABLE manual_access ALTER COLUMN created_at TYPE TIMESTAMPTZ;
+
+-- ===== ДОБАВЛЕНИЕ ПОЛЕЙ ДЛЯ ТЕСТОВЫХ ПОДПИСОК =====
+
+-- Добавление поля типа подписки (test/regular)
+ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS subscription_type VARCHAR(10) DEFAULT 'regular';
+
+-- Обновление существующих записей - установка значений по умолчанию
+UPDATE subscriptions SET subscription_type = 'regular' WHERE subscription_type IS NULL;

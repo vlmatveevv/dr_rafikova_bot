@@ -85,6 +85,19 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
         user_id = int(data.get("shp_user_id"))
         order_id = int(data.get("shp_order_id"))
         formatted_chapter = data.get("shp_formatted_chapter")
+        
+        # Определяем тип подписки на основе суммы платежа и параметров webhook
+        subscription_type_param = data.get("shp_subscription_type", "regular")
+        
+        # Дополнительная проверка: если сумма 1 рубль, то это точно тестовая подписка
+        if out_sum == 1.0:
+            subscription_type_param = "test"
+            logger.info(f"🔍 Определена тестовая подписка по сумме платежа: {out_sum} рубль")
+        elif out_sum == 990.0:
+            subscription_type_param = "regular"
+            logger.info(f"🔍 Определена обычная подписка по сумме платежа: {out_sum} рублей")
+        else:
+            logger.info(f"🔍 Сумма платежа: {out_sum} рублей, тип подписки из параметров: {subscription_type_param}")
 
         # Проверка: уже обработан?
         if pdb.payment_exists_by_order_code(inv_id):
@@ -133,8 +146,27 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
             # Это первый платеж - создаем подписку
             subscription_type = "new_sub"
             try:
-                subscription_id = pdb.create_subscription(user_id, order_id)
-                logger.info(f"✅ Создана подписка {subscription_id} для пользователя {user_id}")
+                if subscription_type_param == "test":
+                    # Дополнительная проверка суммы для тестовой подписки
+                    if out_sum != 1.0:
+                        logger.error(f"❌ Несоответствие: тестовая подписка, но сумма {out_sum} рублей (должна быть 1 рубль)")
+                        return "OK"
+                    
+                    # Проверяем, может ли пользователь создать тестовую подписку
+                    if not pdb.can_create_test_subscription(user_id):
+                        logger.error(f"❌ Пользователь {user_id} не может создать тестовую подписку (уже были подписки)")
+                        return "OK"
+                    
+                    subscription_id = pdb.create_test_subscription(user_id, order_id)
+                    logger.info(f"✅ Создана тестовая подписка {subscription_id} для пользователя {user_id}")
+                else:
+                    # Дополнительная проверка суммы для обычной подписки
+                    if out_sum != 990.0:
+                        logger.warning(f"⚠️ Необычная сумма для обычной подписки: {out_sum} рублей (ожидалось 990 рублей)")
+                    
+                    subscription_id = pdb.create_subscription(user_id, order_id)
+                    logger.info(f"✅ Создана обычная подписка {subscription_id} для пользователя {user_id}")
+                
                 logger.info(f"✅ Задача на повторное списание будет добавлена при следующей синхронизации")
 
             except Exception as e:
@@ -158,10 +190,16 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
+        # Выбираем сообщение в зависимости от типа подписки
+        if subscription_type_param == "test":
+            message_text = config.bot_msg['test_sub']['activated'].format(channel_name=channel_name)
+        else:
+            message_text = config.bot_msg['payment_success'].format(channel_name=channel_name)
+
         background_tasks.add_task(
             telegram_https.send_message,
             user_id=user_id,
-            text=config.bot_msg['payment_success'].format(channel_name=channel_name),
+            text=message_text,
             reply_markup=reply_markup
         )
 
@@ -181,6 +219,14 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
         user_template_str = config.admin_msg['user_info_block']
         user_info_block = Template(user_template_str).render(**user_data)
 
+        # Определяем тип подписки для админского уведомления
+        if subscription_type_param == "test":
+            admin_subscription_type = "test_sub"
+            logger.info(f"📊 Админское уведомление: тестовая подписка за {out_sum} рубль")
+        else:
+            admin_subscription_type = subscription_type
+            logger.info(f"📊 Админское уведомление: {subscription_type} подписка за {out_sum} рублей")
+
         # Рендерим общее сообщение админу
         admin_template_str = config.admin_msg['admin_payment_notification']
         admin_payment_notification_text = Template(admin_template_str).render(
@@ -192,7 +238,7 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
             user_id=user_id,
             order_code=inv_id,
             formatted_chapters=['course'],
-            subscription_type=subscription_type
+            subscription_type=admin_subscription_type
         )
 
         # Уведомление администратору

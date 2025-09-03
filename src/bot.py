@@ -95,16 +95,6 @@ async def register(update: Update, context: CallbackContext) -> int:
     keyboard = [[InlineKeyboardButton(config.bot_btn['buy_courses'], callback_data='pay_chapter')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # await context.bot.send_message(
-    #     chat_id=user_id,
-    #     text=f"{config.bot_msg['hello'].format(first_name=first_name)}",
-    #     reply_markup=reply_markup,
-    #     parse_mode=ParseMode.HTML
-    caption = f"{config.bot_msg['hello'].format(first_name=first_name)}"
-    # avatar_img_path = config.media_dir / "avatar.jpg"
-    # with open(avatar_img_path, 'rb') as photo:
-    #     await send_or_edit_photo(update, context, photo, caption, reply_markup)
-
     caption = f"{config.bot_msg['hello'].format(first_name=first_name)}"
     video_path = config.media_dir / "video.mp4"
 
@@ -228,25 +218,89 @@ async def cancel_sub_command(update: Update, context: CallbackContext) -> None:
 
 
 async def zxc_command(update: Update, context: CallbackContext) -> None:
-    group_id = config.courses.get('course', {}).get('group_id')
-    await update.message.reply_text(group_id)
-    user_id = 7768888247
-    
-    # Удаляем пользователя из канала/группы без постоянного бана
-    await context.bot.ban_chat_member(
-        chat_id=group_id,
-        user_id=user_id
-    )
-    subscription = pdb.get_active_subscription(user_id)
-    pdb.cancel_subscription(subscription['subscription_id'])
-    # Сразу снимаем бан, чтобы пользователь мог вернуться в будущем
-    await context.bot.unban_chat_member(
-        chat_id=group_id,
-        user_id=user_id,
-        only_if_banned=True  # Снимаем бан только если пользователь действительно забанен
-    )
+    user_id = update.message.from_user.id
+    test_ids = [146679674]
 
-    await sync_job_queue_with_db(context)
+    keyboard = [
+        [InlineKeyboardButton(config.bot_btn['test_sub'], callback_data="test_sub")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    if user_id not in test_ids:
+        await update.message.reply_text(text="test", reply_markup=reply_markup)
+        return
+
+
+async def test_sub_callback_handle(update: Update, context: CallbackContext) -> None:
+    """Обработчик кнопки test_sub для создания тестовой подписки"""
+    query = update.callback_query
+    user_id = query.from_user.id
+    
+    # Проверяем, что пользователь в списке тестировщиков
+    test_ids = [146679674]
+    if user_id not in test_ids:
+        await query.answer("❌ У вас нет прав для создания тестовой подписки")
+        return
+    
+    await query.answer()
+    
+    try:
+        # Проверяем, может ли пользователь создать тестовую подписку
+        if not pdb.can_create_test_subscription(user_id):
+            await query.edit_message_text(
+                text=config.bot_msg['test_sub']['not_available_history'],
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("📲 Главное меню", callback_data="main_menu")
+                ]])
+            )
+            return
+        
+        # Проверяем, есть ли уже активная подписка
+        if pdb.has_active_subscription(user_id):
+            await query.edit_message_text(
+                text=config.bot_msg['test_sub']['not_available_active'],
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("📲 Главное меню", callback_data="main_menu")
+                ]])
+            )
+            return
+        
+        # Создаем тестовый заказ
+        order_code = other_func.generate_order_number()
+        order_id = pdb.create_order(user_id=user_id, order_code=order_code)
+        
+        # Получаем email пользователя (если есть)
+        user_info = pdb.get_user_by_user_id(user_id)
+        email = user_info.get('email', '') if user_info else ''
+        
+        # Создаем тестовый платеж
+        payment_url = payment.create_test_payment_robokassa(
+            email=email,
+            order_code=order_code,
+            order_id=order_id,
+            user_id=user_id
+        )
+        
+        # Создаем клавиатуру с кнопкой оплаты
+        keyboard = [
+            [InlineKeyboardButton("💳 Оплатить 1 рубль", url=payment_url)],
+            [InlineKeyboardButton("🚫 Отмена", callback_data="main_menu")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            text=config.bot_msg['test_sub']['info'],
+            reply_markup=reply_markup
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка при создании тестовой подписки: {e}")
+        await query.edit_message_text(
+            text=config.bot_msg['test_sub']['error'],
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("📲 Главное меню", callback_data="main_menu")
+            ]])
+        )
 
 
 async def sync_jobs_command(update: Update, context: CallbackContext) -> None:
@@ -1036,6 +1090,7 @@ def run():
     application.add_handler(CallbackQueryHandler(cancel_sub_final_callback, pattern="^cancel_sub_final$"))
     application.add_handler(CallbackQueryHandler(cancel_sub_keep_callback, pattern="^cancel_sub_keep$"))
     application.add_handler(CallbackQueryHandler(cancel_sub_menu_callback, pattern="^cancel_sub$"))
+    application.add_handler(CallbackQueryHandler(test_sub_callback_handle, pattern="^test_sub$"))
 
     application.add_handler(buy_course_conversation)
     application.add_handler(ChatJoinRequestHandler(handle_join_request))

@@ -562,12 +562,13 @@ class Database:
     #         self.conn.rollback()
     #         raise
 
-    def create_subscription(self, user_id: int, order_id: int) -> int:
+    def create_subscription(self, user_id: int, order_id: int, subscription_type: str = 'regular') -> int:
         """
         Создает новую подписку.
 
         :param user_id: Telegram user ID
         :param order_id: ID заказа
+        :param subscription_type: Тип подписки ('regular' или 'test')
         :return: subscription_id
         """
         try:
@@ -575,28 +576,39 @@ class Database:
                 cancelled_subscription = self.get_cancelled_subscription(user_id)
 
                 if cancelled_subscription:
+                    # Если есть отмененная подписка, то тестовую подписку создавать нельзя
+                    if subscription_type == 'test':
+                        raise Exception("Тестовая подписка недоступна для пользователей с предыдущими подписками")
+                    
                     # Новая подписка начинается с даты истечения старой
                     start_date = cancelled_subscription['end_date']
                     end_date = add_one_month_safe(start_date)
                     next_payment_date = end_date
 
                     query = """
-                        INSERT INTO subscriptions (user_id, order_id, start_date, end_date, next_payment_date)
-                        VALUES (%s, %s, %s, %s, %s)
+                        INSERT INTO subscriptions (user_id, order_id, start_date, end_date, next_payment_date, subscription_type)
+                        VALUES (%s, %s, %s, %s, %s, %s)
                         RETURNING subscription_id;
                     """
-                    cursor.execute(query, (user_id, order_id, start_date, end_date, next_payment_date))
+                    cursor.execute(query, (user_id, order_id, start_date, end_date, next_payment_date, subscription_type))
                 else:
                     now = datetime.now()
-                    end_date = add_one_month_safe(now)
+                    
+                    if subscription_type == 'test':
+                        # Тестовая подписка: 48 часов
+                        end_date = now + timedelta(hours=48)
+                    else:
+                        # Обычная подписка: 1 месяц
+                        end_date = add_one_month_safe(now)
+                    
                     next_payment_date = end_date
 
                     query = """
-                        INSERT INTO subscriptions (user_id, order_id, start_date, end_date, next_payment_date)
-                        VALUES (%s, %s, %s, %s, %s)
+                        INSERT INTO subscriptions (user_id, order_id, start_date, end_date, next_payment_date, subscription_type)
+                        VALUES (%s, %s, %s, %s, %s, %s)
                         RETURNING subscription_id;
                     """
-                    cursor.execute(query, (user_id, order_id, now, end_date, next_payment_date))
+                    cursor.execute(query, (user_id, order_id, now, end_date, next_payment_date, subscription_type))
 
                 subscription_id = cursor.fetchone()[0]
                 self.conn.commit()
@@ -606,6 +618,40 @@ class Database:
             print(f"❌ Ошибка при создании подписки: {e}")
             self.conn.rollback()
             raise
+
+    def can_create_test_subscription(self, user_id: int) -> bool:
+        """
+        Проверяет, может ли пользователь создать тестовую подписку.
+        
+        :param user_id: Telegram user ID
+        :return: True, если пользователь может создать тестовую подписку
+        """
+        try:
+            # Проверяем, есть ли у пользователя какие-либо подписки
+            with self.conn.cursor() as cursor:
+                query = """
+                    SELECT EXISTS (
+                        SELECT 1 FROM subscriptions 
+                        WHERE user_id = %s
+                    )
+                """
+                cursor.execute(query, (user_id,))
+                has_any_subscription = cursor.fetchone()[0]
+                
+                return not has_any_subscription
+        except Exception as e:
+            print(f"❌ Ошибка при проверке возможности создания тестовой подписки: {e}")
+            return False
+
+    def create_test_subscription(self, user_id: int, order_id: int) -> int:
+        """
+        Создает тестовую подписку на 48 часов.
+
+        :param user_id: Telegram user ID
+        :param order_id: ID заказа
+        :return: subscription_id
+        """
+        return self.create_subscription(user_id, order_id, subscription_type='test')
 
     def get_active_subscription(self, user_id: int):
         """
@@ -768,7 +814,43 @@ class Database:
             print(f"❌ Ошибка при получении активных подписок: {e}")
             return []
 
+    def get_test_subscriptions(self):
+        """
+        Получает все активные тестовые подписки.
+        
+        :return: Список активных тестовых подписок
+        """
+        try:
+            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                query = """
+                    SELECT * FROM subscriptions 
+                    WHERE status = 'active' AND subscription_type = 'test' AND end_date > CURRENT_TIMESTAMP
+                    ORDER BY next_payment_date ASC
+                """
+                cursor.execute(query)
+                return cursor.fetchall()
+        except Exception as e:
+            print(f"❌ Ошибка при получении тестовых подписок: {e}")
+            return []
 
+    def get_regular_subscriptions(self):
+        """
+        Получает все активные обычные подписки.
+        
+        :return: Список активных обычных подписок
+        """
+        try:
+            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                query = """
+                    SELECT * FROM subscriptions 
+                    WHERE status = 'active' AND subscription_type = 'regular' AND end_date > CURRENT_TIMESTAMP
+                    ORDER BY next_payment_date ASC
+                """
+                cursor.execute(query)
+                return cursor.fetchall()
+        except Exception as e:
+            print(f"❌ Ошибка при получении обычных подписок: {e}")
+            return []
 
     def schedule_job(self, user_id: int, subscription_id: int, job_type: str, run_at: datetime) -> int:
         """
