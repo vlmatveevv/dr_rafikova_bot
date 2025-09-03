@@ -237,7 +237,7 @@ async def test_sub_callback_handle(update: Update, context: CallbackContext) -> 
     user_id = query.from_user.id
     
     # Проверяем, что пользователь в списке тестировщиков
-    test_ids = [146679674]
+    test_ids = [7768888247]
     if user_id not in test_ids:
         await query.answer("❌ У вас нет прав для создания тестовой подписки")
         return
