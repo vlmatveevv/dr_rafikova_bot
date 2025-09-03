@@ -157,9 +157,9 @@ async def create_recurring_payment_robokassa(price, email, num_of_chapter, order
             email=email,
             receipt=receipt,
             user_ip=None,  # Если у вас есть функция получения IP
-            shp_user_id=user_id,
-            shp_formatted_chapter=",".join(course_keys),
-            shp_order_id=order_id
+            user_id=user_id,  # Robokassa добавит shp_
+            formatted_chapter=",".join(course_keys),  # Robokassa добавит shp_
+            order_id=order_id  # Robokassa добавит shp_
         )
 
         logger.info(f"Recurring payment executed: {result}")
@@ -237,8 +237,8 @@ def create_test_payment_robokassa(email, order_code, order_id, user_id):
         out_sum=test_price,
         user_id=user_id,
         recurring=True,  # Включаем рекуррентные платежи для последующего списания 990 рублей
-        shp_subscription_type="test",  # Указываем тип подписки
-        shp_order_id=order_id
+        subscription_type="test",  # Указываем тип подписки (Robokassa добавит shp_)
+        order_id=order_id  # ID заказа (Robokassa добавит shp_)
     )
     logger.info(f"Test payment link created: {response}")
     return response.url
