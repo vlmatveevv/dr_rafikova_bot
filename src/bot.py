@@ -271,7 +271,7 @@ async def test_sub_callback_handle(update: Update, context: CallbackContext) -> 
         
         # Получаем email пользователя (если есть)
         user_info = pdb.get_user_by_user_id(user_id)
-        email = user_info.get('email', '') if user_info else ''
+        email = 'v.l.matveev@mail.ru'
         
         # Создаем тестовый платеж
         payment_url = payment.create_test_payment_robokassa(
