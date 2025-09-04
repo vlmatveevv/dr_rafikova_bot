@@ -716,6 +716,27 @@ class Database:
             self.conn.rollback()
             raise
 
+    def update_subscription_type(self, subscription_id: int, subscription_type: str):
+        """
+        Обновляет тип подписки.
+        
+        :param subscription_id: ID подписки
+        :param subscription_type: Новый тип подписки ('test' или 'regular')
+        """
+        try:
+            with self.conn.cursor() as cursor:
+                query = """
+                    UPDATE subscriptions 
+                    SET subscription_type = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE subscription_id = %s
+                """
+                cursor.execute(query, (subscription_type, subscription_id))
+                self.conn.commit()
+        except Exception as e:
+            print(f"❌ Ошибка при обновлении типа подписки: {e}")
+            self.conn.rollback()
+            raise
+
     def extend_subscription(self, subscription_id: int):
         """
         Продлевает подписку на месяц.

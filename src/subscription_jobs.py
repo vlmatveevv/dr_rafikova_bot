@@ -198,8 +198,19 @@ async def kick_subscription_job(context):
             pdb.reset_charge_attempts(subscription_id)
             pdb.extend_subscription(subscription_id)
 
-            # Планируем следующее списание через месяц
-            schedule_subscription_jobs(context, user_id, subscription_id)
+            # Получаем обновленные данные подписки
+            subscription = pdb.get_subscription_by_id(subscription_id)
+            if subscription and subscription['subscription_type'] == 'test':
+                # Для тестовых подписок после успешного рекуррентного платежа
+                # меняем тип на обычную подписку и планируем месячные списания
+                pdb.update_subscription_type(subscription_id, 'regular')
+                logger.info(f"🔄 Тестовая подписка {subscription_id} преобразована в обычную после успешного платежа")
+                
+                # Планируем следующее списание через месяц (как для обычной подписки)
+                schedule_subscription_jobs(context, user_id, subscription_id)
+            else:
+                # Для обычных подписок - планируем следующее списание через месяц
+                schedule_subscription_jobs(context, user_id, subscription_id)
 
             logger.info(f"✅ Подписка {subscription_id} продлена после успешного платежа")
         else:
