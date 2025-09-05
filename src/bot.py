@@ -114,7 +114,7 @@ async def register(update: Update, context: CallbackContext) -> int:
     # Задержка 3 секунды перед отправкой текста
     await asyncio.sleep(3)
 
-    await send_or_edit_message(update, context, caption, reply_markup)
+    await send_or_edit_message(update, context, caption, reply_markup, True)
 
     return ConversationHandler.END
 
