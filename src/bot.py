@@ -583,6 +583,7 @@ async def pay_chapter_callback_handle(update: Update, context: CallbackContext) 
     context.user_data['selected_course'] = course
     context.user_data['course_key'] = course_key
     context.user_data['order_id'] = order_id
+    context.user_data['order_code'] = order_code
     context.user_data['is_test_subscription'] = is_test_subscription
 
     context.user_data['is_in_conversation'] = True
