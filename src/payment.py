@@ -210,12 +210,12 @@ def create_test_payment_robokassa(email, order_code, order_id, user_id):
         order_id: ID заказа
         user_id: ID пользователя
     """
-
+    test_price = config.courses['course']['test_price']
     # Данные для чека
     items = [{
         "Name": config.courses['course']['test_short_name_for_receipt'],
         "Quantity": 1,
-        "Sum": config.courses['course']['test_price'],
+        "Sum": test_price,
         "PaymentMethod": "full_prepayment",
         "PaymentObject": "service",
         "Tax": "none"
