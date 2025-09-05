@@ -58,18 +58,20 @@ async def charge_subscription_job(context):
 
         # Создаем повторный платеж с новым заказом
         course = config.courses.get('course')
+
+        price = course['price']
         
-        # Определяем цену в зависимости от типа подписки
-        if subscription['subscription_type'] == 'test':
-            if user_id == 7768888247 or user_id == 5738018066:
-                price = 2
-            else:
-                # Для тестовых подписок списываем полную цену курса
-                price = course['price']  # 990 рублей
-        elif user_id == 7768888247 or user_id == 5738018066:
-            price = 2
-        else:
-            price = course['price']
+        # # Определяем цену в зависимости от типа подписки
+        # if subscription['subscription_type'] == 'test':
+        #     if user_id == 7768888247 or user_id == 5738018066:
+        #         price = 2
+        #     else:
+        #         # Для тестовых подписок списываем полную цену курса
+        #         price = course['price']  # 990 рублей
+        # elif user_id == 7768888247 or user_id == 5738018066:
+        #     price = 2
+        # else:
+        #     price = course['price']
 
         # Создаем рекуррентный платеж
         await payment.create_recurring_payment_robokassa(

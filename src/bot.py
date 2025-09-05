@@ -239,11 +239,11 @@ async def test_sub_callback_handle(update: Update, context: CallbackContext) -> 
     query = update.callback_query
     user_id = query.from_user.id
     
-    # Проверяем, что пользователь в списке тестировщиков
-    test_ids = [7768888247, 5738018066]
-    if user_id not in test_ids:
-        await query.answer("❌ У вас нет прав для создания тестовой подписки")
-        return
+    # # Проверяем, что пользователь в списке тестировщиков
+    # test_ids = [7768888247, 5738018066]
+    # if user_id not in test_ids:
+    #     await query.answer("❌ У вас нет прав для создания тестовой подписки")
+    #     return
     
     await query.answer()
     
@@ -558,16 +558,6 @@ async def pay_chapter_callback_handle(update: Update, context: CallbackContext) 
 
     # Для тестовых подписок проверяем права
     if is_test_subscription:
-        test_ids = [7768888247, 5738018066]
-        if user_id not in test_ids:
-            await query.edit_message_text(
-                text="❌ У вас нет прав для создания тестовой подписки",
-                reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("📲 Главное меню", callback_data="main_menu")
-                ]])
-            )
-            return ConversationHandler.END
-
         # Проверяем, может ли пользователь создать тестовую подписку
         if not pdb.can_create_test_subscription(user_id):
             await query.edit_message_text(
