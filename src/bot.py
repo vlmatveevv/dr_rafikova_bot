@@ -380,7 +380,7 @@ async def jobs_list_command(update: Update, context: CallbackContext) -> None:
             else:
                 next_run_str = "Не определено"
 
-            message += f"🔹 <b>{i}. {job_name}</b>\n"
+            message += f"🔹 {i}. {job_name}\n"
             message += f"   👤 User ID: {user_id_job}\n"
             message += f"   📋 Subscription ID: {subscription_id}\n"
             if order_id != 'N/A':
@@ -391,9 +391,9 @@ async def jobs_list_command(update: Update, context: CallbackContext) -> None:
         if len(message) > 4096:
             parts = [message[i:i + 4096] for i in range(0, len(message), 4096)]
             for i, part in enumerate(parts, 1):
-                await update.message.reply_text(f"{part}\n\n<b>Часть {i}/{len(parts)}</b>", parse_mode=ParseMode.HTML)
+                await update.message.reply_text(f"{part}\n\nЧасть {i}/{len(parts)}")
         else:
-            await update.message.reply_text(message, parse_mode=ParseMode.HTML)
+            await update.message.reply_text(message)
 
     except Exception as e:
         await update.message.reply_text(f"❌ Ошибка при получении списка задач: {e}")
