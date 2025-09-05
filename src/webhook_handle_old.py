@@ -148,6 +148,7 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
         course_names = [course["name"]]
         channel_name = course["name"]
         channel_invite_url = course["channel_invite_link"]
+        group_invite_url = course.get('group_invite_link')
 
         keyboard = [
             [InlineKeyboardButton("Вступить в канал ✅", url=channel_invite_url)],

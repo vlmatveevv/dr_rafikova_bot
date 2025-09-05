@@ -92,7 +92,10 @@ async def register(update: Update, context: CallbackContext) -> int:
     if not await user_exists_pdb(user_id):
         pdb.add_user(user_id, username, first_name, last_name)
 
-    keyboard = [[InlineKeyboardButton(config.bot_btn['buy_courses'], callback_data='pay_chapter')]]
+    keyboard = [
+        [InlineKeyboardButton(config.bot_btn['buy_courses'], callback_data='pay_chapter')],
+        [InlineKeyboardButton(config.bot_btn['test_sub'], callback_data='pay_chapter:test_sub')]
+    ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     caption = f"{config.bot_msg['hello'].format(first_name=first_name)}"
@@ -388,8 +391,8 @@ async def jobs_list_command(update: Update, context: CallbackContext) -> None:
             message += f"   ⏰ Следующий запуск: {next_run_str}\n\n"
 
         # Если сообщение слишком длинное, разбиваем на части
-        if len(message) > 4096:
-            parts = [message[i:i + 4096] for i in range(0, len(message), 4096)]
+        if len(message) > 3800:
+            parts = [message[i:i + 3800] for i in range(0, len(message), 3800)]
             for i, part in enumerate(parts, 1):
                 await update.message.reply_text(f"{part}\n\nЧасть {i}/{len(parts)}")
         else:
@@ -523,6 +526,13 @@ async def pay_chapter_callback_handle(update: Update, context: CallbackContext) 
     await query.answer()
     user_id = query.from_user.id
 
+    # Проверяем, это тестовая подписка или обычная
+    is_test_subscription = False
+    if ':' in query.data:
+        parts = query.data.split(':')
+        if len(parts) > 1 and parts[1] == 'test_sub':
+            is_test_subscription = True
+
     # У нас только один курс
     course_key = 'course'
     course = config.courses.get(course_key)
@@ -546,11 +556,34 @@ async def pay_chapter_callback_handle(update: Update, context: CallbackContext) 
         await send_or_edit_message(update, context, text, reply_markup)
         return ConversationHandler.END
 
+    # Для тестовых подписок проверяем права
+    if is_test_subscription:
+        test_ids = [7768888247, 5738018066]
+        if user_id not in test_ids:
+            await query.edit_message_text(
+                text="❌ У вас нет прав для создания тестовой подписки",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("📲 Главное меню", callback_data="main_menu")
+                ]])
+            )
+            return ConversationHandler.END
+
+        # Проверяем, может ли пользователь создать тестовую подписку
+        if not pdb.can_create_test_subscription(user_id):
+            await query.edit_message_text(
+                text=config.bot_msg['test_sub']['not_available_history'],
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("📲 Главное меню", callback_data="main_menu")
+                ]])
+            )
+            return ConversationHandler.END
+
     order_code = other_func.generate_order_number()
     order_id = pdb.create_order(user_id=user_id, order_code=order_code)
     context.user_data['selected_course'] = course
     context.user_data['course_key'] = course_key
     context.user_data['order_id'] = order_id
+    context.user_data['is_test_subscription'] = is_test_subscription
 
     context.user_data['is_in_conversation'] = True
 
@@ -583,12 +616,12 @@ async def start_payment_handle(update: Update, context: CallbackContext, selecte
 
     # У нас только один курс
     course_key = 'course'
-    order_code = other_func.generate_order_number()
-    order_id = pdb.create_order(user_id=user_id, order_code=order_code)
+    
+    # Данные заказа уже созданы в pay_chapter_callback_handle
+    order_id = context.user_data['order_id']
+    order_code = context.user_data['order_code']
 
     context.user_data['selected_courses'] = [course_key]
-    context.user_data['order_id'] = order_id
-    context.user_data['order_code'] = order_code
 
     keyboard = [
         [InlineKeyboardButton("✅ Принимаю", callback_data=f"agree_offer:{order_code}")],
@@ -596,12 +629,23 @@ async def start_payment_handle(update: Update, context: CallbackContext, selecte
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    text = (
-        "💳 Подписка оформляется на 1 месяц с автоматическим продлением.\n"
-        "Ты можешь отменить её в любой момент.\n\n"
-        "📄 Я ознакомился и принимаю условия Публичной оферты.\n\n"
-        f'<a href="{config.other_cfg["links"]["offer"]}">Открыть оферту</a>'
-    )
+    # Определяем текст в зависимости от типа подписки
+    is_test_subscription = context.user_data.get('is_test_subscription', False)
+    if is_test_subscription:
+        text = (
+            "💳 Тестовая подписка оформляется на 2 дня с автоматическим продлением на полную подписку.\n"
+            "Ты можешь отменить её в любой момент.\n\n"
+            "📄 Я ознакомился и принимаю условия Публичной оферты.\n\n"
+            f'<a href="{config.other_cfg["links"]["offer"]}">Открыть оферту</a>'
+        )
+    else:
+        text = (
+            "💳 Подписка оформляется на 1 месяц с автоматическим продлением.\n"
+            "Ты можешь отменить её в любой момент.\n\n"
+            "📄 Я ознакомился и принимаю условия Публичной оферты.\n\n"
+            f'<a href="{config.other_cfg["links"]["offer"]}">Открыть оферту</a>'
+        )
+    
     await send_or_edit_message(update, context, text, reply_markup)
     return AGREE_OFFER
 
@@ -701,35 +745,55 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
     except Exception as e:
         logger.error(f"Ошибка удаления сообщения: {e}")
 
-    text_lines = [config.bot_msg['confirm_purchase_header'].format(email=email)]
-    # Заголовок
-
-    # Каждая строка курса
-    total_price = 0
-    for course_key in selected_courses:
-        course = config.courses[course_key]
-        line = config.bot_msg['confirm_purchase_course_line'].format(
-            name=course['name'] + course['emoji'],
-            price=course['price']
-        )
-        text_lines.append(line)
-        total_price += course['price']
-
-    # Итог
-    text_lines.append(config.bot_msg['confirm_purchase_footer'].format(total=total_price))
+    # Определяем тип подписки и цену
+    is_test_subscription = context.user_data.get('is_test_subscription', False)
+    
+    if is_test_subscription:
+        # Для тестовых подписок
+        text_lines = [f"📧 Email: {email}"]
+        text_lines.append("🧪 Тестовая подписка на 2 дня")
+        total_price = config.courses['course']['test_price']  # 1 рубль
+        text_lines.append(f"💰 Сумма: {total_price} руб.")
+    else:
+        # Для обычных подписок
+        text_lines = [config.bot_msg['confirm_purchase_header'].format(email=email)]
+        
+        # Каждая строка курса
+        total_price = 0
+        for course_key in selected_courses:
+            course = config.courses[course_key]
+            line = config.bot_msg['confirm_purchase_course_line'].format(
+                name=course['name'] + course['emoji'],
+                price=course['price']
+            )
+            text_lines.append(line)
+            total_price += course['price']
+        
+        # Итог
+        text_lines.append(config.bot_msg['confirm_purchase_footer'].format(total=total_price))
 
     text = "\n".join(text_lines)
-    if user_id == 7768888247:
-        total_price = 1
+    
+    # Специальная цена для тестировщиков
+    if user_id == 7768888247 or user_id == 5738018066:
+        total_price = 2
 
     # Создаём платёж
-    payment_url = payment.create_payment_robokassa(
-        price=total_price,
-        email=email,
-        num_of_chapter=",".join(selected_courses),
-        order_code=order_code,
-        order_id=order_id,
-        user_id=user_id)
+    if is_test_subscription:
+        payment_url = payment.create_test_payment_robokassa(
+            email=email,
+            order_code=order_code,
+            order_id=order_id,
+            user_id=user_id
+        )
+    else:
+        payment_url = payment.create_payment_robokassa(
+            price=total_price,
+            email=email,
+            num_of_chapter=",".join(selected_courses),
+            order_code=order_code,
+            order_id=order_id,
+            user_id=user_id)
 
     keyboard = [
         [InlineKeyboardButton("✅ Подтвердить и оплатить", url=payment_url)],
@@ -1012,7 +1076,7 @@ async def post_init(application: Application) -> None:
 
 buy_course_conversation = ConversationHandler(
     entry_points=[
-        CallbackQueryHandler(pay_chapter_callback_handle, pattern="^pay_chapter$"),
+        CallbackQueryHandler(pay_chapter_callback_handle, pattern="^pay_chapter"),
         CallbackQueryHandler(confirm_multi_buy_handle, pattern="^confirm_buy_multiply$")
     ],
     states={
