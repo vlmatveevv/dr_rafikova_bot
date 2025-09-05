@@ -107,7 +107,7 @@ async def register(update: Update, context: CallbackContext) -> int:
                 chat_id=user_id,
                 video_note=video
             )
-            await asyncio.sleep(3)
+        await asyncio.sleep(3)
     except telegram.error.BadRequest as e:
         logger.info(f"Ошибка при отправке video note: {e}")
         pass
