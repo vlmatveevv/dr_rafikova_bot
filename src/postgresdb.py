@@ -759,13 +759,14 @@ class Database:
                     # Иначе просто увеличиваем месяц
                     new_next_payment = current_next_payment.replace(month=current_next_payment.month + 1)
                 
-                # Обновляем подписку и сбрасываем счетчик попыток
+                # Обновляем подписку, сбрасываем счетчик попыток и меняем тип на regular
                 query = """
                     UPDATE subscriptions 
                     SET end_date = end_date + INTERVAL '1 month',
                         next_payment_date = %s,
                         charge_attempts = 0,
                         last_charge_attempt = NULL,
+                        subscription_type = 'regular',
                         updated_at = CURRENT_TIMESTAMP
                     WHERE subscription_id = %s
                 """
