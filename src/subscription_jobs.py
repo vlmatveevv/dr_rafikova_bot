@@ -347,8 +347,8 @@ def schedule_subscription_jobs(context, user_id: int, subscription_id: int):
         
         if subscription['subscription_type'] == 'test':
             # Для тестовых подписок - через 48 часов
-            next_payment_date = now + timedelta(minutes=3)
-            time_until_payment = timedelta(minutes=3)
+            next_payment_date = now + timedelta(hours=48)
+            time_until_payment = timedelta(hours=48)
             logger.info(f"📅 Тестовая подписка {subscription_id}: следующий платеж через 48 часов")
         else:
             # Для обычных подписок - через месяц
