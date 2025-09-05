@@ -177,12 +177,13 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
         else:
             message_text = config.bot_msg['payment_success'].format(channel_name=channel_name)
 
-        background_tasks.add_task(
-            telegram_https.send_message,
-            user_id=user_id,
-            text=message_text,
-            reply_markup=reply_markup
-        )
+        if subscription_type == 'new_sub':
+            background_tasks.add_task(
+                telegram_https.send_message,
+                user_id=user_id,
+                text=message_text,
+                reply_markup=reply_markup
+            )
 
         # Подготовка данных о пользователе
         user_info = pdb.get_user_by_user_id(user_id)
