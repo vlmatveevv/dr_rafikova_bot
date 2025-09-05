@@ -1,5 +1,7 @@
 admin_payment_notification: |
-  {% if subscription_type == "new_sub" %}
+  {% if subscription_type == "test_sub" %}
+  💸 <b>Оплата пробной подписки</b>
+  {% elif subscription_type == "new_sub" %}
   💸 <b>Оплата новой подписки</b>
   {% else %}
   💸 <b>Оплата продления подписки</b>
