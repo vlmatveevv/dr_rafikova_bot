@@ -755,10 +755,10 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
     course = config.courses['course']
 
     if is_test_subscription:
-        text_lines += config.bot_msg['confirm_purchase_type_line_test']
+        text_lines.append(config.bot_msg['confirm_purchase_type_line_test'])
         price = course['test_price']
     else:
-        text_lines += config.bot_msg['confirm_purchase_type_line_regular']
+        text_lines.append(config.bot_msg['confirm_purchase_type_line_regular'])
         price = course['price']
 
     # Каждая строка курса
