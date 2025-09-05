@@ -30,9 +30,10 @@ confirm_purchase_header: |
   <b>Подтверждение</b>
 
   Ваш эл. адрес: {email}
-  
-  Вы оформляете подписку на закрытый Telegram-канал "Материнство":
-
+confirm_purchase_type_line_test: |
+  Вы оформляете пробную подписку на закрытый Telegram-канал "Материнство"
+confirm_purchase_type_line_regular: |
+  Вы оформляете подписку на закрытый Telegram-канал "Материнство"
 confirm_purchase_course_line: |
   • {name} — <b>{price} ₽</b>
 

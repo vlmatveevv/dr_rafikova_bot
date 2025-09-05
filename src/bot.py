@@ -749,36 +749,33 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
     # Определяем тип подписки и цену
     is_test_subscription = context.user_data.get('is_test_subscription', False)
     
+    # Для обычных подписок
+    text_lines = [config.bot_msg['confirm_purchase_header'].format(email=email)]
+
+    course = config.courses['course']
+
     if is_test_subscription:
-        # Для тестовых подписок
-        text_lines = [f"📧 Email: {email}"]
-        text_lines.append("🧪 Тестовая подписка на 2 дня")
-        total_price = config.courses['course']['test_price']  # 1 рубль
-        text_lines.append(f"💰 Сумма: {total_price} руб.")
+        text_lines += config.bot_msg['confirm_purchase_type_line_test']
+        price = course['test_price']
     else:
-        # Для обычных подписок
-        text_lines = [config.bot_msg['confirm_purchase_header'].format(email=email)]
-        
-        # Каждая строка курса
-        total_price = 0
-        for course_key in selected_courses:
-            course = config.courses[course_key]
-            line = config.bot_msg['confirm_purchase_course_line'].format(
-                name=course['name'] + course['emoji'],
-                price=course['price']
-            )
-            text_lines.append(line)
-            total_price += course['price']
-        
-        # Итог
-        text_lines.append(config.bot_msg['confirm_purchase_footer'].format(total=total_price))
+        text_lines += config.bot_msg['confirm_purchase_type_line_regular']
+        price = course['price']
+
+    # Каждая строка курса
+    # total_price = 0
+    # for course_key in selected_courses:
+    course = config.courses['course']
+    line = config.bot_msg['confirm_purchase_course_line'].format(
+        name=course['name'] + course['emoji'],
+        price=price
+    )
+    text_lines.append(line)
+
+    # Итог
+    text_lines.append(config.bot_msg['confirm_purchase_footer'].format(total=price))
 
     text = "\n".join(text_lines)
     
-    # Специальная цена для тестировщиков
-    if user_id == 7768888247 or user_id == 5738018066:
-        total_price = 2
-
     # Создаём платёж
     if is_test_subscription:
         payment_url = payment.create_test_payment_robokassa(
@@ -789,7 +786,7 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
         )
     else:
         payment_url = payment.create_payment_robokassa(
-            price=total_price,
+            price=price,
             email=email,
             num_of_chapter=",".join(selected_courses),
             order_code=order_code,
