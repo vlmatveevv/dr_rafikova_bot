@@ -20,6 +20,7 @@ import keyboard as my_keyboard
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, BotCommand, ReplyKeyboardMarkup, \
     ReplyKeyboardRemove, KeyboardButton, InputMediaPhoto, InputMediaDocument
 from telegram.constants import ParseMode, ChatAction
+from telegram.error import RetryAfter
 from telegram.ext import (
     Application,
     ApplicationBuilder,
@@ -218,18 +219,103 @@ async def cancel_sub_command(update: Update, context: CallbackContext) -> None:
     await send_or_edit_message(update, context, text, reply_markup)
 
 
-async def zxc_command(update: Update, context: CallbackContext) -> None:
-    user_id = update.message.from_user.id
-    test_ids = [146679674]
+async def send_bulk_text_from_yaml(
+    update: Update,
+    context: CallbackContext,
+    user_ids: list[int],   # <-- теперь сюда можно передавать готовый список
+    batch_size: int = 50,
+    per_message_delay: float = 0.2,
+    between_batch_delay: float = 5.0,
+) -> None:
+    """
+    Простая массовая рассылка текстовых сообщений:
+    - Берёт текст из config.bot_msg['mailling']
+    - Шлёт только текст
+    - Логирует RetryAfter, ошибки и отправляет отчёты админу в бот
+    - Исключает дублирующиеся user_id
+    """
+    admin_msg = update.effective_message
 
     keyboard = [
-        [InlineKeyboardButton(config.bot_btn['test_sub'], callback_data="test_sub")]
+        [InlineKeyboardButton(config.bot_btn['main_menu']['start'], callback_data="start")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    if user_id not in test_ids:
-        await update.message.reply_text(text="test", reply_markup=reply_markup)
+    # 1) Убираем дубликаты
+    all_user_ids = list(dict.fromkeys(user_ids))
+
+    await admin_msg.reply_text(
+        f"Старт рассылки.\n"
+        f"Получателей (уникальных): {len(all_user_ids)}"
+    )
+
+    # 2) Получаем текст для рассылки
+    try:
+        text = config.bot_msg['mailling']
+    except Exception as e:
+        logger.exception("Не удалось загрузить текст из config: %s", e)
+        await admin_msg.reply_text(f"Ошибка загрузки текста: {e}")
         return
+
+    # 3) Статистика
+    successful_sends = 0
+    failed_sends_count = 0
+
+    logger.info("Начало рассылки для %d пользователей.", len(all_user_ids))
+
+    # 4) Рассылка по батчам
+    for i in range(0, len(all_user_ids), batch_size):
+        batch = all_user_ids[i:i + batch_size]
+
+        for user_id in batch:
+            try:
+                await context.bot.send_message(
+                    chat_id=user_id,
+                    text=text,
+                    reply_markup=reply_markup,
+                    parse_mode=None  # чистый текст
+                )
+                successful_sends += 1
+            except RetryAfter as e:
+                logger.warning("Flood control для %s: ждём %s сек", user_id, e.retry_after)
+                await asyncio.sleep(e.retry_after)
+                failed_sends_count += 1
+            except Exception as e:
+                logger.error("Ошибка для %s: %s", user_id, e)
+                failed_sends_count += 1
+
+            await asyncio.sleep(per_message_delay)  # задержка между сообщениями
+
+        # Промежуточный статус после батча
+        await admin_msg.reply_text(
+            f"Батч завершён: {len(batch)} пользователей.\n"
+            f"Итого: ✅ {successful_sends}, ❌ {failed_sends_count}.\n"
+            f"Пауза {between_batch_delay:.1f} секунд."
+        )
+        await asyncio.sleep(between_batch_delay)
+
+    # 5) Итоговый отчёт
+    await admin_msg.reply_text(
+        f"Рассылка завершена ✅\n"
+        f"Успешно: {successful_sends}\n"
+        f"Не удалось: {failed_sends_count}"
+    )
+
+
+async def zxc_command(update: Update, context: CallbackContext) -> None:
+    user_id = update.message.from_user.id
+    test_ids = [146679674, 146679674, 7768888247]
+
+    await send_bulk_text_from_yaml(update, context, test_ids)
+
+    # keyboard = [
+    #     [InlineKeyboardButton(config.bot_btn['test_sub'], callback_data="test_sub")]
+    # ]
+    # reply_markup = InlineKeyboardMarkup(keyboard)
+    #
+    # if user_id not in test_ids:
+    #     await update.message.reply_text(text="test", reply_markup=reply_markup)
+    #     return
 
 
 async def test_sub_callback_handle(update: Update, context: CallbackContext) -> None:
