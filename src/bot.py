@@ -305,7 +305,8 @@ async def send_bulk_text_from_yaml(
 async def zxc_command(update: Update, context: CallbackContext) -> None:
     user_id = update.message.from_user.id
     test_ids = [146679674, 146679674, 7768888247]
-
+    user_ids_without_subscriptions = pdb.get_user_ids_without_subscriptions()
+    logger.info(user_ids_without_subscriptions)
     await send_bulk_text_from_yaml(update, context, test_ids)
 
     # keyboard = [

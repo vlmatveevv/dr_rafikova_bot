@@ -874,6 +874,31 @@ class Database:
             print(f"❌ Ошибка при получении обычных подписок: {e}")
             return []
 
+    def get_user_ids_without_subscriptions(self) -> list[int]:
+        """
+        Возвращает список user_id всех пользователей, у которых нет активных подписок.
+
+        :return: список user_id
+        """
+        try:
+            with self.conn.cursor() as cursor:
+                query = """
+                    SELECT u.user_id
+                    FROM users u
+                    LEFT JOIN subscriptions s ON u.user_id = s.user_id
+                    WHERE s.user_id IS NULL
+                """
+                cursor.execute(query)
+                rows = cursor.fetchall()
+
+                # Преобразуем результат в список
+                user_ids = [row[0] for row in rows]
+
+                return user_ids
+        except Exception as e:
+            print(f"❌ Ошибка при получении пользователей без подписок: {e}")
+            return []
+
     def schedule_job(self, user_id: int, subscription_id: int, job_type: str, run_at: datetime) -> int:
         """
         Создает задачу в scheduled_jobs для резерва.
