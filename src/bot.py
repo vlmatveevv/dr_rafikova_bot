@@ -333,7 +333,7 @@ async def zxc_command(update: Update, context: CallbackContext) -> None:
         await send_bulk_text_from_yaml(
             update,
             context,
-            test_ids,
+            user_ids_without_subscriptions,
             photo=photo
         )
 
