@@ -246,7 +246,8 @@ async def send_bulk_text_from_yaml(
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     # 1) Убираем дубликаты
-    all_user_ids = list(dict.fromkeys(user_ids))
+    # all_user_ids = list(dict.fromkeys(user_ids))
+    all_user_ids = user_ids
 
     await admin_msg.reply_text(
         f"Старт рассылки.\nПолучателей (уникальных): {len(all_user_ids)}"
