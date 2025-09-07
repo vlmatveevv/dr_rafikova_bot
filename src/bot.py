@@ -8,6 +8,7 @@ import re
 import time as time_new
 from datetime import time, datetime, timedelta, timezone
 from pathlib import Path
+from typing import Optional, Union, IO
 
 import pytz
 import telegram
@@ -222,18 +223,22 @@ async def cancel_sub_command(update: Update, context: CallbackContext) -> None:
 async def send_bulk_text_from_yaml(
     update: Update,
     context: CallbackContext,
-    user_ids: list[int],   # <-- теперь сюда можно передавать готовый список
+    user_ids: list[int],
     batch_size: int = 50,
     per_message_delay: float = 0.2,
     between_batch_delay: float = 5.0,
+    *,
+    photo: Optional[Union[str, InputFile, IO[bytes]]] = None,  # <-- Фото или None
+    parse_mode: Optional[str] = None,
 ) -> None:
     """
-    Простая массовая рассылка текстовых сообщений:
-    - Берёт текст из config.bot_msg['mailling']
-    - Шлёт только текст
-    - Логирует RetryAfter, ошибки и отправляет отчёты админу в бот
-    - Исключает дублирующиеся user_id
+    Массовая рассылка сообщений пользователям:
+    - Если передан `photo`, отправляем фото с caption = config.bot_msg['mailling'].
+    - Если фото не передано — отправляем обычное текстовое сообщение.
+    - Логируем RetryAfter и ошибки.
+    - Шлём промежуточные статусы админу после каждого батча.
     """
+
     admin_msg = update.effective_message
 
     keyboard = [
@@ -245,13 +250,14 @@ async def send_bulk_text_from_yaml(
     all_user_ids = list(dict.fromkeys(user_ids))
 
     await admin_msg.reply_text(
-        f"Старт рассылки.\n"
-        f"Получателей (уникальных): {len(all_user_ids)}"
+        f"Старт рассылки.\nПолучателей (уникальных): {len(all_user_ids)}"
     )
 
     # 2) Получаем текст для рассылки
     try:
         text = config.bot_msg['mailling']
+        if not isinstance(text, str):
+            raise ValueError("config.bot_msg['mailling'] должен быть строкой")
     except Exception as e:
         logger.exception("Не удалось загрузить текст из config: %s", e)
         await admin_msg.reply_text(f"Ошибка загрузки текста: {e}")
@@ -269,13 +275,26 @@ async def send_bulk_text_from_yaml(
 
         for user_id in batch:
             try:
-                await context.bot.send_message(
-                    chat_id=user_id,
-                    text=text,
-                    reply_markup=reply_markup,
-                    parse_mode=None  # чистый текст
-                )
+                if photo:
+                    # Отправляем фото с подписью
+                    await context.bot.send_photo(
+                        chat_id=user_id,
+                        photo=photo,
+                        caption=text,
+                        reply_markup=reply_markup,
+                        parse_mode=parse_mode,
+                    )
+                else:
+                    # Отправляем обычное текстовое сообщение
+                    await context.bot.send_message(
+                        chat_id=user_id,
+                        text=text,
+                        reply_markup=reply_markup,
+                        parse_mode=parse_mode,
+                    )
+
                 successful_sends += 1
+
             except RetryAfter as e:
                 logger.warning("Flood control для %s: ждём %s сек", user_id, e.retry_after)
                 await asyncio.sleep(e.retry_after)
@@ -284,9 +303,10 @@ async def send_bulk_text_from_yaml(
                 logger.error("Ошибка для %s: %s", user_id, e)
                 failed_sends_count += 1
 
-            await asyncio.sleep(per_message_delay)  # задержка между сообщениями
+            # задержка между сообщениями
+            await asyncio.sleep(per_message_delay)
 
-        # Промежуточный статус после батча
+        # Промежуточный статус после каждого батча
         await admin_msg.reply_text(
             f"Батч завершён: {len(batch)} пользователей.\n"
             f"Итого: ✅ {successful_sends}, ❌ {failed_sends_count}.\n"
@@ -296,9 +316,7 @@ async def send_bulk_text_from_yaml(
 
     # 5) Итоговый отчёт
     await admin_msg.reply_text(
-        f"Рассылка завершена ✅\n"
-        f"Успешно: {successful_sends}\n"
-        f"Не удалось: {failed_sends_count}"
+        f"Рассылка завершена ✅\nУспешно: {successful_sends}\nНе удалось: {failed_sends_count}"
     )
 
 
@@ -306,7 +324,19 @@ async def zxc_command(update: Update, context: CallbackContext) -> None:
     user_id = update.message.from_user.id
     test_ids = [146679674, 146679674, 7768888247]
     user_ids_without_subscriptions = pdb.get_user_ids_without_subscriptions()
-    # await send_bulk_text_from_yaml(update, context, user_ids_without_subscriptions)
+    # await send_bulk_text_from_yaml(update, context, test_ids)
+
+    # Путь к фото
+    ref_path = config.media_dir / "mother.jpg"
+
+    # Открываем файл в бинарном режиме
+    with open(ref_path, 'rb') as photo:
+        await send_bulk_text_from_yaml(
+            update,
+            context,
+            test_ids,
+            photo=photo
+        )
 
     # keyboard = [
     #     [InlineKeyboardButton(config.bot_btn['test_sub'], callback_data="test_sub")]
