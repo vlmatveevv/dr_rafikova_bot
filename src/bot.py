@@ -228,7 +228,7 @@ async def send_bulk_text_from_yaml(
     per_message_delay: float = 0.2,
     between_batch_delay: float = 5.0,
     *,
-    photo: Optional[Union[str, InputFile, IO[bytes]]] = None,  # <-- Фото или None
+    photo: Optional[Union[str, IO[bytes]]] = None,  # <-- Фото или None
     parse_mode: Optional[str] = None,
 ) -> None:
     """
