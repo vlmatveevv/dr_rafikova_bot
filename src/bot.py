@@ -229,7 +229,6 @@ async def send_bulk_text_from_yaml(
     between_batch_delay: float = 5.0,
     *,
     photo: Optional[Union[str, IO[bytes]]] = None,  # <-- Фото или None
-    parse_mode: Optional[str] = None,
 ) -> None:
     """
     Массовая рассылка сообщений пользователям:
@@ -282,7 +281,7 @@ async def send_bulk_text_from_yaml(
                         photo=photo,
                         caption=text,
                         reply_markup=reply_markup,
-                        parse_mode=parse_mode,
+                        parse_mode=ParseMode.HTML
                     )
                 else:
                     # Отправляем обычное текстовое сообщение
@@ -290,7 +289,7 @@ async def send_bulk_text_from_yaml(
                         chat_id=user_id,
                         text=text,
                         reply_markup=reply_markup,
-                        parse_mode=parse_mode,
+                        parse_mode=ParseMode.HTML
                     )
 
                 successful_sends += 1
