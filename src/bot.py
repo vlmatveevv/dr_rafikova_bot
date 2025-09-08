@@ -95,8 +95,8 @@ async def register(update: Update, context: CallbackContext) -> int:
         pdb.add_user(user_id, username, first_name, last_name)
 
     keyboard = [
-        [InlineKeyboardButton(config.bot_btn['buy_courses'], callback_data='pay_chapter')],
-        [InlineKeyboardButton(config.bot_btn['test_sub'], callback_data='pay_chapter:test_sub')]
+        [InlineKeyboardButton(config.bot_btn['buy_courses'], callback_data='pay_chapter')]
+        # [InlineKeyboardButton(config.bot_btn['test_sub'], callback_data='pay_chapter:test_sub')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -631,6 +631,11 @@ async def buy_chapter_callback_handle(update: Update, context: CallbackContext) 
 
     reply_markup = InlineKeyboardMarkup(keyboard)
     await send_or_edit_message(update, context, text, reply_markup)
+
+
+async def pay_chapter_test_callback_handle(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    await query.answer("Продажа пробных подписок завершена")
 
 
 # Переход к оплате
@@ -1177,7 +1182,7 @@ async def post_init(application: Application) -> None:
 
 buy_course_conversation = ConversationHandler(
     entry_points=[
-        CallbackQueryHandler(pay_chapter_callback_handle, pattern="^pay_chapter"),
+        CallbackQueryHandler(pay_chapter_callback_handle, pattern="^pay_chapter$"),
         CallbackQueryHandler(confirm_multi_buy_handle, pattern="^confirm_buy_multiply$")
     ],
     states={
@@ -1229,6 +1234,7 @@ def run():
     application.add_handler(CallbackQueryHandler(start_callback_handle, pattern="^start$"))
     application.add_handler(CallbackQueryHandler(buy_courses_callback_handle, pattern="^buy_courses$"))
     application.add_handler(CallbackQueryHandler(buy_chapter_callback_handle, pattern="^buy_chapter$"))
+    application.add_handler(CallbackQueryHandler(pay_chapter_test_callback_handle, pattern="^pay_chapter:test_sub"))
 
     # application.add_handler(CallbackQueryHandler(buy_multiply_callback_handle, pattern="^buy_multiply$"))
 
