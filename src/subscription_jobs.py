@@ -6,6 +6,7 @@ import payment
 import config
 import other_func
 import keyboard
+from postgresdb import add_one_month_safe
 
 logger = logging.getLogger(__name__)
 
@@ -335,8 +336,7 @@ def schedule_subscription_jobs(context, user_id: int, subscription_id: int):
     :param subscription_id: ID подписки
     """
     try:
-        # Сбрасываем счетчик попыток списания при создании новой подписки
-        pdb.reset_charge_attempts(subscription_id)
+        # pdb.reset_charge_attempts(subscription_id)
 
         # Получаем данные подписки для определения типа
         subscription = pdb.get_subscription_by_id(subscription_id)
@@ -354,12 +354,7 @@ def schedule_subscription_jobs(context, user_id: int, subscription_id: int):
             logger.info(f"📅 Тестовая подписка {subscription_id}: следующий платеж через 48 часов")
         else:
             # Для обычных подписок - через месяц
-            if now.month == 12:
-                # Если декабрь, то следующий месяц - январь следующего года
-                next_payment_date = now.replace(year=now.year + 1, month=1)
-            else:
-                # Иначе просто увеличиваем месяц
-                next_payment_date = now.replace(month=now.month + 1)
+            next_payment_date = add_one_month_safe(now)
             time_until_payment = next_payment_date - now
             logger.info(f"📅 Обычная подписка {subscription_id}: следующий платеж через месяц")
 
