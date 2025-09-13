@@ -40,6 +40,19 @@ async def charge_subscription_job(context):
             logger.warning(f"⚠️ Превышено количество попыток списания для подписки {subscription_id}")
             # Удаляем пользователя из канала
             pdb.remove_user_from_channel(user_id)
+
+            kick_job_name = f"kick_{subscription_id}_{user_id}"
+            kick_time = subscription['end_date']
+
+            # Проверяем, что время еще не наступило
+            now = datetime.now(timezone.utc)
+            if kick_time <= now:
+                context.job_queue.run_once(
+                    kick_subscription_job,
+                    when=timedelta(seconds=1),
+                    data={'user_id': user_id, 'subscription_id': subscription_id},
+                    name=kick_job_name
+                )
             return
 
         # Создаем новый заказ для повторного списания
