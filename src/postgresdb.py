@@ -1140,3 +1140,22 @@ class Database:
         except Exception as e:
             print(f"❌ Ошибка при получении ожидающей задачи: {e}")
             return None
+
+    def get_cancelled_and_expired_subscriptions(self):
+        """
+        Возвращает подписки со статусом 'cancelled', у которых end_date уже в прошлом/сейчас.
+        """
+        try:
+            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                query = """
+                    SELECT *
+                    FROM subscriptions
+                    WHERE status = 'cancelled'
+                      AND end_date <= CURRENT_TIMESTAMP
+                    ORDER BY end_date ASC
+                """
+                cursor.execute(query)
+                return cursor.fetchall()
+        except Exception as e:
+            print(f"❌ Ошибка при получении отмененных и истекших подписок: {e}")
+            return []

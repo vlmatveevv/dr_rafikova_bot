@@ -74,7 +74,7 @@ async def charge_subscription_job(context):
         course = config.courses.get('course')
 
         price = course['price']
-        
+
         # # Определяем цену в зависимости от типа подписки
         # if subscription['subscription_type'] == 'test':
         #     if user_id == 7768888247 or user_id == 5738018066:
@@ -221,7 +221,7 @@ async def kick_subscription_job(context):
                 # меняем тип на обычную подписку и планируем месячные списания
                 pdb.update_subscription_type(subscription_id, 'regular')
                 logger.info(f"🔄 Тестовая подписка {subscription_id} преобразована в обычную после успешного платежа")
-                
+
                 # Планируем следующее списание через месяц (как для обычной подписки)
                 schedule_subscription_jobs(context, user_id, subscription_id)
             else:
@@ -340,6 +340,157 @@ async def notify_subscription_job(context):
         logger.error(f"❌ Ошибка при обработке notify job: {e}")
 
 
+async def sync_job_queue_with_db(context):
+    """
+    Синхронизирует job_queue с БД - очищает и добавляет все задачи из БД.
+    Запускается каждый день в 04:00.
+    """
+    try:
+        logger.info("🔄 Начинаем синхронизацию job_queue с БД")
+
+        # Удаляем только задачи подписок
+        job_names_to_remove = []
+        for job in context.job_queue.jobs():
+            if job.name and (job.name.startswith("charge_") or job.name.startswith("kick_")):
+                job.schedule_removal()
+                job_names_to_remove.append(job.name)
+
+        if job_names_to_remove:
+            logger.info(f"✅ Удалены задачи подписок: {job_names_to_remove}")
+        else:
+            logger.info("ℹ️ Задач подписок для удаления не найдено")
+
+        # Получаем все активные подписки
+        active_subscriptions = pdb.get_all_active_subscriptions()
+
+        for subscription in active_subscriptions:
+            user_id = subscription['user_id']
+            subscription_id = subscription['subscription_id']
+            next_payment_date = subscription['next_payment_date']
+
+            existing_job_id = pdb.get_pending_job_by_subscription_and_type(subscription_id, 'charge')
+
+            charge_job_name = f"charge_{subscription_id}_{user_id}"
+            existing_jobs = context.job_queue.get_jobs_by_name(charge_job_name)
+
+            now = datetime.now(timezone.utc)
+
+            if existing_job_id and not existing_jobs:
+                logger.info(f"🔄 Восстанавливаем задачу для подписки {subscription_id} из БД")
+                time_until_payment = next_payment_date - now
+
+                if time_until_payment.total_seconds() > 0:
+                    context.job_queue.run_once(
+                        charge_subscription_job,
+                        when=time_until_payment,
+                        data={'user_id': user_id, 'subscription_id': subscription_id},
+                        name=charge_job_name
+                    )
+                    logger.info(
+                        f"✅ Восстановлена задача {charge_job_name} на {next_payment_date.strftime('%d.%m.%Y %H:%M')}")
+                else:
+                    urgent_time = now + timedelta(minutes=1)
+                    context.job_queue.run_once(
+                        charge_subscription_job,
+                        when=timedelta(minutes=1),
+                        data={'user_id': user_id, 'subscription_id': subscription_id},
+                        name=charge_job_name
+                    )
+                    logger.info(f"✅ Восстановлена срочная задача {charge_job_name} - платеж просрочен")
+                continue
+
+            if existing_job_id and existing_jobs:
+                logger.info(f"ℹ️ Задача для подписки {subscription_id} уже существует в БД и job_queue, пропускаем")
+                continue
+
+            if not existing_job_id and not existing_jobs:
+                logger.info(f"🆕 Создаем новую задачу для подписки {subscription_id}")
+                time_until_payment = next_payment_date - now
+
+                if time_until_payment.total_seconds() > 0:
+                    context.job_queue.run_once(
+                        charge_subscription_job,
+                        when=time_until_payment,
+                        data={'user_id': user_id, 'subscription_id': subscription_id},
+                        name=charge_job_name
+                    )
+                    try:
+                        db_job_id = pdb.schedule_job(user_id, subscription_id, 'charge', next_payment_date)
+                        logger.info(
+                            f"✅ Создана задача {charge_job_name} (БД ID: {db_job_id}) на {next_payment_date.strftime('%d.%m.%Y %H:%M')}")
+                    except Exception as e:
+                        logger.error(f"❌ Ошибка при создании задачи в БД: {e}")
+                else:
+                    urgent_time = now + timedelta(minutes=1)
+                    context.job_queue.run_once(
+                        charge_subscription_job,
+                        when=timedelta(minutes=1),
+                        data={'user_id': user_id, 'subscription_id': subscription_id},
+                        name=charge_job_name
+                    )
+                    try:
+                        db_job_id = pdb.schedule_job(user_id, subscription_id, 'charge', urgent_time)
+                        logger.info(
+                            f"✅ Создана срочная задача {charge_job_name} (БД ID: {db_job_id}) - платеж просрочен")
+                    except Exception as e:
+                        logger.error(f"❌ Ошибка при создании срочной задачи в БД: {e}")
+
+        # === ДОБАВЛЕНО: ставим kick для отменённых и уже истёкших подписок ===
+        cancelled_expired_subscriptions = pdb.get_cancelled_and_expired_subscriptions()
+
+        for subscription in cancelled_expired_subscriptions:
+            user_id = subscription['user_id']
+            subscription_id = subscription['subscription_id']
+
+            existing_kick_job_id = pdb.get_pending_job_by_subscription_and_type(subscription_id, 'kick')
+
+            kick_job_name = f"kick_{subscription_id}_{user_id}"
+            existing_kick_jobs = context.job_queue.get_jobs_by_name(kick_job_name)
+
+            now = datetime.now(timezone.utc)
+
+            # «Ближайшее время»: через 5 секунд (можно вернуть 1 минуту, если так удобнее)
+            kick_delay = timedelta(seconds=5)
+            kick_time = now + kick_delay
+
+            if existing_kick_job_id and existing_kick_jobs:
+                logger.info(
+                    f"ℹ️ Kick-задача для подписки {subscription_id} уже существует в БД и job_queue, пропускаем")
+                continue
+
+            if existing_kick_job_id and not existing_kick_jobs:
+                logger.info(f"🔄 Восстанавливаем kick-задачу для подписки {subscription_id} из БД")
+                context.job_queue.run_once(
+                    kick_subscription_job,
+                    when=kick_delay,
+                    data={'user_id': user_id, 'subscription_id': subscription_id},
+                    name=kick_job_name
+                )
+                logger.info(f"✅ Восстановлена kick-задача {kick_job_name} на немедленное выполнение")
+                continue
+
+            if not existing_kick_job_id and not existing_kick_jobs:
+                logger.info(f"🆕 Создаем kick-задачу для подписки {subscription_id}")
+                context.job_queue.run_once(
+                    kick_subscription_job,
+                    when=kick_delay,
+                    data={'user_id': user_id, 'subscription_id': subscription_id},
+                    name=kick_job_name
+                )
+                try:
+                    db_job_id = pdb.schedule_job(user_id, subscription_id, 'kick', kick_time)
+                    logger.info(f"✅ Создана kick-задача {kick_job_name} (БД ID: {db_job_id})")
+                except Exception as e:
+                    logger.error(f"❌ Ошибка при создании kick-задачи в БД: {e}")
+
+        # ⬇️ Перенесённый итоговый лог (после блока kick)
+        logger.info(f"✅ Синхронизация завершена. Обработано {len(active_subscriptions)} активных подписок, "
+                    f"kick-проверок: {len(cancelled_expired_subscriptions)}")
+
+    except Exception as e:
+        logger.error(f"❌ Ошибка при синхронизации job_queue: {e}")
+
+
 def schedule_subscription_jobs(context, user_id: int, subscription_id: int):
     """
     Планирует задачи для подписки.
@@ -359,7 +510,7 @@ def schedule_subscription_jobs(context, user_id: int, subscription_id: int):
 
         # Вычисляем дату следующего платежа в зависимости от типа подписки
         now = datetime.now(timezone.utc)
-        
+
         if subscription['subscription_type'] == 'test':
             # Для тестовых подписок - через 48 часов
             next_payment_date = now + timedelta(hours=48)
@@ -385,7 +536,8 @@ def schedule_subscription_jobs(context, user_id: int, subscription_id: int):
         # Дублируем в БД для резерва
         try:
             db_job_id = pdb.schedule_job(user_id, subscription_id, 'charge', next_payment_date)
-            logger.info(f"✅ Создана задача {charge_job_name} (БД ID: {db_job_id}) на {next_payment_date.strftime('%d.%m.%Y %H:%M')}")
+            logger.info(
+                f"✅ Создана задача {charge_job_name} (БД ID: {db_job_id}) на {next_payment_date.strftime('%d.%m.%Y %H:%M')}")
         except Exception as e:
             logger.error(f"❌ Ошибка при создании задачи в БД: {e}")
 
@@ -445,125 +597,6 @@ def cancel_subscription_jobs(context, subscription_id: int, user_id: int):
 
     except Exception as e:
         logger.error(f"❌ Ошибка при отмене задач подписки: {e}")
-
-
-async def sync_job_queue_with_db(context):
-    """
-    Синхронизирует job_queue с БД - очищает и добавляет все задачи из БД.
-    Запускается каждый день в 04:00.
-    """
-    try:
-        logger.info("🔄 Начинаем синхронизацию job_queue с БД")
-
-        # Удаляем только задачи подписок
-        job_names_to_remove = []
-        for job in context.job_queue.jobs():
-            if job.name and (job.name.startswith("charge_") or job.name.startswith("kick_")):
-                job.schedule_removal()
-                job_names_to_remove.append(job.name)
-
-        if job_names_to_remove:
-            logger.info(f"✅ Удалены задачи подписок: {job_names_to_remove}")
-        else:
-            logger.info("ℹ️ Задач подписок для удаления не найдено")
-
-        # Получаем все активные подписки
-        active_subscriptions = pdb.get_all_active_subscriptions()
-
-        for subscription in active_subscriptions:
-            user_id = subscription['user_id']
-            subscription_id = subscription['subscription_id']
-            next_payment_date = subscription['next_payment_date']
-
-            # Проверяем, есть ли уже задача в БД для этой подписки
-            existing_job_id = pdb.get_pending_job_by_subscription_and_type(subscription_id, 'charge')
-
-            # Проверяем, есть ли уже задача в job_queue
-            charge_job_name = f"charge_{subscription_id}_{user_id}"
-            existing_jobs = context.job_queue.get_jobs_by_name(charge_job_name)
-
-            # Если задача есть в БД, но нет в job_queue - восстанавливаем
-            if existing_job_id and not existing_jobs:
-                logger.info(f"🔄 Восстанавливаем задачу для подписки {subscription_id} из БД")
-
-                # Вычисляем время до следующего платежа
-                from datetime import timezone
-                now = datetime.now(timezone.utc)
-                time_until_payment = next_payment_date - now
-
-                if time_until_payment.total_seconds() > 0:
-                    context.job_queue.run_once(
-                        charge_subscription_job,
-                        when=time_until_payment,
-                        data={'user_id': user_id, 'subscription_id': subscription_id},
-                        name=charge_job_name
-                    )
-                    logger.info(
-                        f"✅ Восстановлена задача {charge_job_name} на {next_payment_date.strftime('%d.%m.%Y %H:%M')}")
-                else:
-                    # Время уже наступило, создаем срочную задачу
-                    urgent_time = now + timedelta(minutes=1)
-                    context.job_queue.run_once(
-                        charge_subscription_job,
-                        when=timedelta(minutes=1),
-                        data={'user_id': user_id, 'subscription_id': subscription_id},
-                        name=charge_job_name
-                    )
-                    logger.info(f"✅ Восстановлена срочная задача {charge_job_name} - платеж просрочен")
-                continue
-
-            # Если задача уже есть и в БД, и в job_queue - пропускаем
-            if existing_job_id and existing_jobs:
-                logger.info(f"ℹ️ Задача для подписки {subscription_id} уже существует в БД и job_queue, пропускаем")
-                continue
-
-            # Если задачи нет ни в БД, ни в job_queue - создаем новую
-            if not existing_job_id and not existing_jobs:
-                logger.info(f"🆕 Создаем новую задачу для подписки {subscription_id}")
-
-                # Вычисляем время до следующего платежа
-                from datetime import timezone
-                now = datetime.now(timezone.utc)
-                time_until_payment = next_payment_date - now
-
-                # Если время еще не наступило, создаем задачу
-                if time_until_payment.total_seconds() > 0:
-                    context.job_queue.run_once(
-                        charge_subscription_job,
-                        when=time_until_payment,
-                        data={'user_id': user_id, 'subscription_id': subscription_id},
-                        name=charge_job_name
-                    )
-
-                    # Создаем запись в scheduled_jobs
-                    try:
-                        db_job_id = pdb.schedule_job(user_id, subscription_id, 'charge', next_payment_date)
-                        logger.info(
-                            f"✅ Создана задача {charge_job_name} (БД ID: {db_job_id}) на {next_payment_date.strftime('%d.%m.%Y %H:%M')}")
-                    except Exception as e:
-                        logger.error(f"❌ Ошибка при создании задачи в БД: {e}")
-                else:
-                    # Время уже наступило, создаем задачу на ближайшее время
-                    urgent_time = now + timedelta(minutes=1)
-                    context.job_queue.run_once(
-                        charge_subscription_job,
-                        when=timedelta(minutes=1),  # Через минуту
-                        data={'user_id': user_id, 'subscription_id': subscription_id},
-                        name=charge_job_name
-                    )
-
-                    # Создаем запись в scheduled_jobs для срочной задачи
-                    try:
-                        db_job_id = pdb.schedule_job(user_id, subscription_id, 'charge', urgent_time)
-                        logger.info(
-                            f"✅ Создана срочная задача {charge_job_name} (БД ID: {db_job_id}) - платеж просрочен")
-                    except Exception as e:
-                        logger.error(f"❌ Ошибка при создании срочной задачи в БД: {e}")
-
-        logger.info(f"✅ Синхронизация завершена. Обработано {len(active_subscriptions)} подписок")
-
-    except Exception as e:
-        logger.error(f"❌ Ошибка при синхронизации job_queue: {e}")
 
 
 def schedule_daily_sync(context):
