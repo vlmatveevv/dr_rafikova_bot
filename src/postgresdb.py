@@ -789,7 +789,7 @@ class Database:
                 query = """
                     SELECT EXISTS (
                         SELECT 1 FROM subscriptions 
-                        WHERE user_id = %s AND status = 'active' AND end_date > CURRENT_TIMESTAMP
+                        WHERE user_id = %s AND status = 'active'
                     )
                 """
                 cursor.execute(query, (user_id,))
