@@ -678,7 +678,8 @@ async def pay_chapter_callback_handle(update: Update, context: CallbackContext) 
             "Продажи доступа завершены"
         )
         await send_or_edit_message(update, context, text)
-
+    logger.info(pdb.has_active_subscription(user_id))
+    logger.info('line 682')
     # Для тестовых подписок проверяем права
     if is_test_subscription:
         # Проверяем, может ли пользователь создать тестовую подписку
