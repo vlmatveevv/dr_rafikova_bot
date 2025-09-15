@@ -664,7 +664,7 @@ async def pay_chapter_callback_handle(update: Update, context: CallbackContext) 
     if pdb.has_active_subscription(user_id):
         text = (
             "У вас уже есть активная подписка! "
-            "Если хотите привязать другую карту, сначала отмените текущую подписку."
+            "Для отмены текущей подписки нажмите кнопку ниже."
         )
 
         reply_markup = InlineKeyboardMarkup([
@@ -678,8 +678,7 @@ async def pay_chapter_callback_handle(update: Update, context: CallbackContext) 
             "Продажи доступа завершены"
         )
         await send_or_edit_message(update, context, text)
-    logger.info(pdb.has_active_subscription(user_id))
-    logger.info('line 682')
+        return ConversationHandler.END
     # Для тестовых подписок проверяем права
     if is_test_subscription:
         # Проверяем, может ли пользователь создать тестовую подписку

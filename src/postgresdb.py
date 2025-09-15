@@ -1151,7 +1151,7 @@ class Database:
                     SELECT *
                     FROM subscriptions
                     WHERE status = 'cancelled'
-                      AND end_date <= CURRENT_TIMESTAMP
+                    AND end_date <= CURRENT_TIMESTAMP
                     ORDER BY end_date ASC
                 """
                 cursor.execute(query)
