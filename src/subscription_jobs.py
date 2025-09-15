@@ -142,6 +142,8 @@ async def kick_subscription_job(context):
     user_id = job.data['user_id']
     subscription_id = job.data['subscription_id']
     order_id = job.data.get('order_id')  # ID заказа для проверки платежа
+    channel_ban_status = False
+    group_ban_status = False
 
     try:
         # Получаем подписку и проверяем её статус
@@ -174,6 +176,7 @@ async def kick_subscription_job(context):
                             user_id=user_id,
                             only_if_banned=True  # Снимаем бан только если пользователь действительно забанен
                         )
+                        channel_ban_status = True
                         logger.info(f"✅ Пользователь {user_id} забанен в канале {channel_id} (отмененная подписка)")
                     else:
                         logger.error(f"❌ Не удалось получить channel_id для бана пользователя {user_id}")
@@ -188,17 +191,19 @@ async def kick_subscription_job(context):
                             user_id=user_id,
                             only_if_banned=True  # Снимаем бан только если пользователь действительно забанен
                         )
+                        group_ban_status = True
                         logger.info(f"✅ Пользователь {user_id} забанен в чате {group_id}")
                     else:
                         logger.error(f"❌ Не удалось получить group_id для бана пользователя {user_id}")
                 except Exception as e:
                     logger.error(f"❌ Ошибка при бане пользователя {user_id} из канала: {e}")
 
-                await context.bot.send_message(
-                    chat_id=user_id,
-                    text="❌ Ваша подписка была отменена. Для оформления новой подписки нажмите кнопку ниже.",
-                    reply_markup=keyboard.renew_subscription_button_markup()
-                )
+                if channel_ban_status or group_ban_status:
+                    await context.bot.send_message(
+                        chat_id=user_id,
+                        text="❌ Ваша подписка была отменена. Для оформления новой подписки нажмите кнопку ниже.",
+                        reply_markup=keyboard.renew_subscription_button_markup()
+                    )
                 logger.info(f"✅ Пользователь {user_id} удален из канала (отмененная подписка)")
                 return
 
