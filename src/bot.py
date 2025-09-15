@@ -673,6 +673,11 @@ async def pay_chapter_callback_handle(update: Update, context: CallbackContext) 
 
         await send_or_edit_message(update, context, text, reply_markup)
         return ConversationHandler.END
+    else:
+        text = (
+            "Продажи доступа завершены"
+        )
+        await send_or_edit_message(update, context, text)
 
     # Для тестовых подписок проверяем права
     if is_test_subscription:
