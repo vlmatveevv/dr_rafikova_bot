@@ -111,7 +111,7 @@ def create_payment_robokassa(price, email, num_of_chapter, order_code, order_id,
     return response.url
 
 
-async def create_recurring_payment_robokassa(price, email, num_of_chapter, order_code, order_id, user_id,
+async def create_recurring_payment_robokassa_old(price, email, num_of_chapter, order_code, order_id, user_id,
                                              previous_inv_id):
     """
     Создает рекуррентный платеж через Robokassa
@@ -170,34 +170,21 @@ async def create_recurring_payment_robokassa(price, email, num_of_chapter, order
         raise e
 
 
-# Пример использования:
-async def charge_monthly_subscription():
+async def create_recurring_payment_robokassa(price, email, num_of_chapter, order_code, order_id, user_id,
+                                             previous_inv_id):
     """
-    Пример функции для ежемесячного списания подписки
+    Создает рекуррентный платеж через Robokassa
+
+    Args:
+        price: Сумма платежа
+        email: Email пользователя
+        num_of_chapter: Ключи курсов (например: "course")
+        order_code: Новый код заказа
+        order_id: Новый ID заказа
+        user_id: ID пользователя
+        previous_inv_id: ID первого успешного платежа (для рекуррентных списаний)
     """
-    try:
-        # Получаем данные подписки из БД
-        first_payment_inv_id = 27167
-        user_email = 'ya.matveev116@ya.ru'
-        subscription_price = 15
-
-        # Выполняем рекуррентный платеж
-        result = await create_recurring_payment_robokassa(
-            price=subscription_price,
-            email=user_email,
-            num_of_chapter='8',
-            order_code=34534535,
-            order_id=9899,
-            user_id=146679674,
-            previous_inv_id=first_payment_inv_id  # ← ID первого платежа
-        )
-
-        return result
-
-    except Exception as e:
-        logger.error(f"Monthly subscription charge failed for user: {e}")
-        # Здесь можно добавить логику уведомления пользователя об ошибке
-        raise e
+    logger.info("No create_recurring_payment_robokassa")
 
 
 def create_test_payment_robokassa(email, order_code, order_id, user_id):

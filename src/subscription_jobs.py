@@ -11,7 +11,7 @@ from postgresdb import add_one_month_safe
 logger = logging.getLogger(__name__)
 
 
-async def charge_subscription_job(context):
+async def charge_subscription_job_old(context):
     """
     Задача на повторное списание подписки.
     Отправляет рекуррентный платеж и планирует kick задачу для проверки результата.
@@ -130,6 +130,16 @@ async def charge_subscription_job(context):
                 logger.info(f"✅ Задача charge {job_id} отмечена как выполненная в БД")
         except Exception as e:
             logger.error(f"❌ Ошибка при отметке задачи charge в БД: {e}")
+
+
+async def charge_subscription_job(context):
+    """
+    Задача на повторное списание подписки.
+    Отправляет рекуррентный платеж и планирует kick задачу для проверки результата.
+    """
+    job = context.job
+    user_id = job.data['user_id']
+    subscription_id = job.data['subscription_id']
 
 
 async def kick_subscription_job(context):
