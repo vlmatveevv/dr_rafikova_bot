@@ -1150,9 +1150,9 @@ class Database:
                 query = """
                     SELECT *
                     FROM subscriptions
-                    WHERE status = 'cancelled'
-                    AND end_date <= CURRENT_TIMESTAMP
-                    ORDER BY end_date ASC
+                    WHERE (status = 'cancelled' OR status = 'expired')
+                      AND end_date <= CURRENT_TIMESTAMP
+                    ORDER BY end_date ASC;
                 """
                 cursor.execute(query)
                 return cursor.fetchall()
