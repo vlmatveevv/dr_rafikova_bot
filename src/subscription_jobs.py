@@ -142,7 +142,7 @@ async def charge_subscription_job(context):
     subscription_id = job.data['subscription_id']
 
 
-async def kick_subscription_job(context):
+async def kick_subscription_job_old(context):
     """
     Задача на проверку результата платежа.
     Проверяет успешность платежа и либо продлевает подписку, 
@@ -337,6 +337,19 @@ async def kick_subscription_job(context):
                 logger.info(f"✅ Задача {job_id} отмечена как выполненная в БД")
         except Exception as e:
             logger.error(f"❌ Ошибка при отметке задачи в БД: {e}")
+
+
+async def kick_subscription_job(context):
+    """
+    Задача на проверку результата платежа.
+    Проверяет успешность платежа и либо продлевает подписку,
+    либо планирует следующую попытку списания, либо удаляет из канала.
+    """
+    job = context.job
+    user_id = job.data['user_id']
+    subscription_id = job.data['subscription_id']
+    order_id = job.data.get('order_id')  # ID заказа для проверки платежа
+
 
 
 async def notify_subscription_job(context):
