@@ -17,26 +17,45 @@ def buy_multiply_button_markup():
     )]]
     return keyboard
 
+#
+# def ch_choose_button(available_courses=None):
+#     chapter_order = ['ch_7', 'ch_1', 'ch_2', 'ch_3', 'ch_4', 'ch_5', 'ch_6']
+#     keyboard = []
+#
+#     for key in chapter_order:
+#         if available_courses is None or key in available_courses:
+#             course = config.courses[key]
+#             num_of_chapter = key.split('_')[1]
+#             button = InlineKeyboardButton(
+#                 text=course['short_name'] + course['emoji'],
+#                 callback_data=f'buy_chapter:{num_of_chapter}'
+#             )
+#             keyboard.append([button])
+#
+#     return keyboard
+
 
 def ch_choose_button(available_courses=None, mode='buy', selected=None, menu_path='def'):
+    chapter_order = ['ch_6', 'ch_1', 'ch_2', 'ch_3', 'ch_4', 'ch_5']
     keyboard = []
 
-    # Теперь у нас только один курс
-    course_key = 'course'
-    course = config.courses.get(course_key)
-    
-    if course:
-        name = course['short_name'] + course['emoji']
+    selected = selected or []
 
-        # Добавляем галочку, если в режиме multi_buy и курс выбран
-        if mode == 'multi_buy' and course_key in (selected or []):
-            name = '✅ ' + name
+    for key in chapter_order:
+        if available_courses is None or key in available_courses:
+            course = config.courses[key]
+            num_of_chapter = key.split('_')[1]
+            name = course['short_name'] + course['emoji']
 
-        button = InlineKeyboardButton(
-            text=name,
-            callback_data=f'{mode}_chapter:{menu_path}'
-        )
-        keyboard.append([button])
+            # Добавляем галочку, если в режиме multi_buy и глава выбрана
+            if mode == 'multi_buy' and key in selected:
+                name = '✅ ' + name
+
+            button = InlineKeyboardButton(
+                text=name,
+                callback_data=f'{mode}_chapter:{num_of_chapter}:{menu_path}'  # например: multi_buy_chapter:1
+            )
+            keyboard.append([button])
 
     return keyboard
 
@@ -63,15 +82,3 @@ def buy_multiply_menu_items_button():
     ]
 
     return buttons
-
-
-def renew_subscription_button_markup():
-    """
-    Кнопка для оформления подписки заново.
-    Используется при неудачных попытках списания.
-    """
-    keyboard = [[InlineKeyboardButton(
-        text=config.bot_btn['renew_subscription'],
-        callback_data='pay_chapter'
-    )]]
-    return InlineKeyboardMarkup(keyboard)

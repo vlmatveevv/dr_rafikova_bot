@@ -4,25 +4,11 @@ from psycopg2 import sql
 from psycopg2.extras import RealDictCursor, execute_values
 import config
 import logging
-from datetime import datetime, timedelta
-import calendar
+from datetime import datetime
 
 # Настройка логгера
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-
-def add_one_month_safe(dt: datetime) -> datetime:
-    # считаем следующий месяц/год
-    if dt.month == 12:
-        year, month = dt.year + 1, 1
-    else:
-        year, month = dt.year, dt.month + 1
-    # последний день следующего месяца
-    last_day = calendar.monthrange(year, month)[1]
-    # если, например, было 31, а в след. месяце 30 — ставим 30
-    day = min(dt.day, last_day)
-    return dt.replace(year=year, month=month, day=day)
 
 
 class Database:
@@ -187,27 +173,54 @@ class Database:
     def get_paid_courses_by_user(self, user_id: int) -> list:
         """
         Возвращает список курсов, которые пользователь успешно оплатил.
-        У нас только один курс, поэтому возвращаем ['course'] если есть оплата.
 
         :param user_id: ID пользователя.
-        :return: Список с одним элементом ['course'] или пустой список.
+        :return: Список названий курсов (course_chapter).
         """
         try:
             with self.conn.cursor() as cursor:
                 query = """
-                    SELECT EXISTS (
-                        SELECT 1
-                        FROM orders o
-                        JOIN payments p ON o.order_id = p.order_id
-                        WHERE o.user_id = %s
-                    )
+                    SELECT DISTINCT o.course_chapter
+                    FROM orders o
+                    JOIN payments p ON o.order_id = p.order_id
+                    WHERE o.user_id = %s
                 """
                 cursor.execute(query, (user_id,))
-                has_payment = cursor.fetchone()[0]
-                return ['course'] if has_payment else []
+                result = cursor.fetchall()
+                return [row[0] for row in result]  # список course_chapter
         except Exception as e:
             print(f"Ошибка при получении курсов: {e}")
             return []
+
+    # def get_all_user_courses(self, user_id: int) -> list:
+    #     """
+    #     Возвращает список всех курсов, к которым у пользователя есть доступ:
+    #     - оплаченные
+    #     - выданные вручную (manual_access)
+    #
+    #     :param user_id: Telegram user ID
+    #     :return: список course_chapter
+    #     """
+    #     try:
+    #         with self.conn.cursor() as cursor:
+    #             query = """
+    #                 SELECT DISTINCT course_chapter FROM (
+    #                     SELECT o.course_chapter
+    #                     FROM orders o
+    #                     JOIN payments p ON o.order_id = p.order_id
+    #                     WHERE o.user_id = %s
+    #                     UNION
+    #                     SELECT ma.course_chapter
+    #                     FROM manual_access ma
+    #                     WHERE ma.user_id = %s
+    #                 ) AS combined
+    #             """
+    #             cursor.execute(query, (user_id, user_id))
+    #             result = cursor.fetchall()
+    #             return [row[0] for row in result]
+    #     except Exception as e:
+    #         print(f"❌ Ошибка при получении всех доступных курсов: {e}")
+    #         return []
 
     def get_all_user_courses(self, user_id: int) -> list:
         """
@@ -216,73 +229,93 @@ class Database:
         - выданные вручную (manual_access)
 
         :param user_id: Telegram user ID
-        :return: список с одним элементом ['course'] или пустой список
+        :return: список course_chapter
         """
         try:
             with self.conn.cursor() as cursor:
-                # Проверяем оплату
-                query_payment = """
-                    SELECT EXISTS (
-                        SELECT 1
+                query = """
+                    SELECT DISTINCT unnest(course_chapter) AS chapter FROM (
+                        SELECT o.course_chapter
                         FROM orders o
                         JOIN payments p ON o.order_id = p.order_id
                         WHERE o.user_id = %s
-                    )
+                        UNION ALL
+                        SELECT ARRAY[ma.course_chapter]  -- manual_access.course_chapter — строка
+                        FROM manual_access ma
+                        WHERE ma.user_id = %s
+                    ) AS combined
                 """
-                cursor.execute(query_payment, (user_id,))
-                has_payment = cursor.fetchone()[0]
-
-                # Проверяем ручной доступ
-                query_manual = """
-                    SELECT EXISTS (
-                        SELECT 1 FROM manual_access
-                        WHERE user_id = %s AND course_chapter = 'course'
-                    )
-                """
-                cursor.execute(query_manual, (user_id,))
-                has_manual = cursor.fetchone()[0]
-
-                return ['course'] if (has_payment or has_manual) else []
+                cursor.execute(query, (user_id, user_id))
+                result = cursor.fetchall()
+                return [row[0] for row in result]
         except Exception as e:
             print(f"❌ Ошибка при получении всех доступных курсов: {e}")
             return []
+
+    # def has_paid_course(self, user_id: int, course_chapter: str) -> bool:
+    #     """
+    #     Проверяет, оплатил ли пользователь указанный курс.
+    #
+    #     :param user_id: ID пользователя.
+    #     :param course_chapter: Название курса/раздела.
+    #     :return: True, если оплата есть, иначе False.
+    #     """
+    #     try:
+    #         with self.conn.cursor() as cursor:
+    #             query = """
+    #                 SELECT EXISTS (
+    #                     SELECT 1
+    #                     FROM orders o
+    #                     JOIN payments p ON o.order_id = p.order_id
+    #                     WHERE o.user_id = %s AND o.course_chapter = %s
+    #                 )
+    #             """
+    #             cursor.execute(query, (user_id, course_chapter))
+    #             result = cursor.fetchone()
+    #             return result[0]  # True или False
+    #     except Exception as e:
+    #         print(f"Ошибка при проверке оплаты курса: {e}")
+    #         return False
 
     def get_not_bought_courses(self, user_id: int) -> list:
         """
         Возвращает список курсов, которые пользователь еще не купил.
 
         :param user_id: Telegram user ID
-        :return: список с одним элементом ['course'] если не куплен, иначе пустой список
+        :return: список course_chapter, которые доступны в config.courses, но не куплены
         """
         try:
             with self.conn.cursor() as cursor:
-                # Проверяем, есть ли оплата или ручной доступ
+                # Получаем уже купленные курсы
                 query = """
-                    SELECT EXISTS (
-                        SELECT 1
+                    SELECT DISTINCT unnest(course_chapter) AS chapter FROM (
+                        SELECT o.course_chapter
                         FROM orders o
                         JOIN payments p ON o.order_id = p.order_id
                         WHERE o.user_id = %s
-                    )
-                    OR EXISTS (
-                        SELECT 1 FROM manual_access
-                        WHERE user_id = %s AND course_chapter = 'course'
-                    )
+                        UNION ALL
+                        SELECT ARRAY[ma.course_chapter]
+                        FROM manual_access ma
+                        WHERE ma.user_id = %s
+                    ) AS combined
                 """
                 cursor.execute(query, (user_id, user_id))
-                has_access = cursor.fetchone()[0]
-                
-                return ['course'] if not has_access else []
+                bought_courses = {row[0] for row in cursor.fetchall()}
+
+                # Вычитаем из всех возможных курсов
+                all_courses = set(config.courses.keys())
+                not_bought = list(all_courses - bought_courses)
+                return not_bought
         except Exception as e:
             print(f"❌ Ошибка при получении некупленных курсов: {e}")
             return []
 
     def has_paid_course(self, user_id: int, course_chapter: str) -> bool:
         """
-        Проверяет, оплатил ли пользователь курс.
+        Проверяет, оплатил ли пользователь указанный курс.
 
         :param user_id: ID пользователя.
-        :param course_chapter: Игнорируется, у нас только один курс.
+        :param course_chapter: Название курса/раздела.
         :return: True, если оплата есть, иначе False.
         """
         try:
@@ -292,33 +325,55 @@ class Database:
                         SELECT 1
                         FROM orders o
                         JOIN payments p ON o.order_id = p.order_id
-                        WHERE o.user_id = %s
+                        WHERE o.user_id = %s AND %s = ANY(o.course_chapter)
                     )
                 """
-                cursor.execute(query, (user_id,))
+                cursor.execute(query, (user_id, course_chapter))
                 result = cursor.fetchone()
                 return result[0]  # True или False
         except Exception as e:
             print(f"Ошибка при проверке оплаты курса: {e}")
             return False
 
-    def create_order(self, user_id: int, order_code: int) -> int:
+    # def create_order(self, user_id: int, course_chapter: str, order_code: int) -> int:
+    #     """
+    #     Создает заказ в таблице orders и возвращает order_id.
+    #     Email будет добавлен позже.
+    #     """
+    #     try:
+    #         with self.conn.cursor() as cursor:
+    #             query = """
+    #                 INSERT INTO orders (user_id, course_chapter, order_code)
+    #                 VALUES (%s, %s, %s)
+    #                 RETURNING order_id;
+    #             """
+    #             cursor.execute(query, (user_id, course_chapter, order_code))
+    #             order_id = cursor.fetchone()[0]
+    #             self.conn.commit()
+    #             return order_id
+    #     except Exception as e:
+    #         print(f"❌ Ошибка при создании заказа: {e}")
+    #         self.conn.rollback()
+    #         raise
+
+    def create_order(self, user_id: int, course_chapter: list[str], order_code: int) -> int:
         """
         Создает заказ в таблице orders и возвращает order_id.
         Email будет добавлен позже.
 
         :param user_id: Telegram user ID
+        :param course_chapter: Список курсов, например: ['ch1', 'ch3']
         :param order_code: Уникальный код заказа
         :return: order_id
         """
         try:
             with self.conn.cursor() as cursor:
                 query = """
-                    INSERT INTO orders (user_id, order_code)
-                    VALUES (%s, %s)
+                    INSERT INTO orders (user_id, course_chapter, order_code)
+                    VALUES (%s, %s, %s)
                     RETURNING order_id;
                 """
-                cursor.execute(query, (user_id, order_code))
+                cursor.execute(query, (user_id, course_chapter, order_code))
                 order_id = cursor.fetchone()[0]
                 self.conn.commit()
                 return order_id
@@ -450,31 +505,14 @@ class Database:
             print(f"Error getting order: {e}")
             return None
 
-    def get_order_by_id(self, order_id: int):
-        """
-        Получение информации о заказе по order_id.
-        :param order_id: ID заказа.
-        :return: Словарь с данными заказа или None.
-        """
-        try:
-            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                cursor.execute("""
-                    SELECT * FROM orders WHERE order_id = %s
-                """, (order_id,))
-                return cursor.fetchone()
-        except Exception as e:
-            self.conn.rollback()
-            print(f"Error getting order by id: {e}")
-            return None
-
-    def grant_manual_access(self, user_id: int, granted_by: int):
+    def grant_manual_access(self, user_id: int, course_chapter: str, granted_by: int):
         try:
             with self.conn.cursor() as cursor:
                 cursor.execute("""
                     INSERT INTO manual_access (user_id, course_chapter, granted_by)
-                    VALUES (%s, 'course', %s)
+                    VALUES (%s, %s, %s)
                     ON CONFLICT (user_id, course_chapter) DO NOTHING
-                """, (user_id, granted_by))
+                """, (user_id, course_chapter, granted_by))
                 self.conn.commit()
         except Exception as e:
             print(f"❌ Ошибка при добавлении доступа в manual_access: {e}")
@@ -486,7 +524,7 @@ class Database:
         Проверяет, был ли пользователю вручную выдан доступ к курсу.
 
         :param user_id: Telegram ID пользователя.
-        :param course_chapter: Игнорируется, у нас только один курс.
+        :param course_chapter: Название курса (например, 'ch_1').
         :return: True, если доступ есть, иначе False.
         """
         try:
@@ -494,668 +532,10 @@ class Database:
                 cursor.execute("""
                     SELECT EXISTS (
                         SELECT 1 FROM manual_access
-                        WHERE user_id = %s AND course_chapter = 'course'
+                        WHERE user_id = %s AND course_chapter = %s
                     )
-                """, (user_id,))
+                """, (user_id, course_chapter))
                 return cursor.fetchone()[0]
         except Exception as e:
             print(f"❌ Ошибка при проверке ручного доступа: {e}")
             return False
-
-    # ===== ФУНКЦИИ ДЛЯ ПОДПИСОК =====
-
-    # def create_subscription(self, user_id: int, order_id: int) -> int:
-    #     """
-    #     Создает новую подписку.
-    #
-    #     :param user_id: Telegram user ID
-    #     :param order_id: ID заказа
-    #     :return: subscription_id
-    #     """
-    #     try:
-    #         with self.conn.cursor() as cursor:
-    #             # Проверяем, есть ли отмененная подписка
-    #             cancelled_subscription = self.get_cancelled_subscription(user_id)
-    #
-    #             if cancelled_subscription:
-    #                 # Новая подписка начинается с даты истечения старой
-    #                 start_date = cancelled_subscription['end_date']
-    #                 # Вычисляем дату следующего платежа (то же число следующего месяца)
-    #                 if start_date.month == 12:
-    #                     # Если декабрь, то следующий месяц - январь следующего года
-    #                     next_payment_date = start_date.replace(year=start_date.year + 1, month=1)
-    #                 else:
-    #                     # Иначе просто увеличиваем месяц
-    #                     next_payment_date = start_date.replace(month=start_date.month + 1)
-    #
-    #                 # Устанавливаем даты: начало с даты истечения старой подписки, конец через месяц
-    #                 query = """
-    #                     INSERT INTO subscriptions (user_id, order_id, start_date, end_date, next_payment_date)
-    #                     VALUES (%s, %s, %s, %s + INTERVAL '1 month', %s)
-    #                     RETURNING subscription_id;
-    #                 """
-    #                 cursor.execute(query, (user_id, order_id, start_date, start_date, next_payment_date))
-    #             else:
-    #                 # Обычная логика создания подписки
-    #                 # Вычисляем дату следующего платежа (то же число следующего месяца)
-    #                 now = datetime.now()
-    #                 if now.month == 12:
-    #                     # Если декабрь, то следующий месяц - январь следующего года
-    #                     next_payment_date = now.replace(year=now.year + 1, month=1)
-    #                 else:
-    #                     # Иначе просто увеличиваем месяц
-    #                     next_payment_date = now.replace(month=now.month + 1)
-    #
-    #                 # Устанавливаем даты: начало сейчас, конец через месяц
-    #                 query = """
-    #                     INSERT INTO subscriptions (user_id, order_id, start_date, end_date, next_payment_date)
-    #                     VALUES (%s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '1 month', %s)
-    #                     RETURNING subscription_id;
-    #                 """
-    #                 cursor.execute(query, (user_id, order_id, next_payment_date))
-    #
-    #             subscription_id = cursor.fetchone()[0]
-    #             self.conn.commit()
-    #             return subscription_id
-    #     except Exception as e:
-    #         print(f"❌ Ошибка при создании подписки: {e}")
-    #         self.conn.rollback()
-    #         raise
-
-    def create_subscription(self, user_id: int, order_id: int, subscription_type: str = 'regular') -> int:
-        """
-        Создает новую подписку.
-
-        :param user_id: Telegram user ID
-        :param order_id: ID заказа
-        :param subscription_type: Тип подписки ('regular' или 'test')
-        :return: subscription_id
-        """
-        try:
-            with self.conn.cursor() as cursor:
-                cancelled_subscription = self.get_cancelled_subscription(user_id)
-
-                if cancelled_subscription:
-                    # Если есть отмененная подписка, то тестовую подписку создавать нельзя
-                    if subscription_type == 'test':
-                        raise Exception("Тестовая подписка недоступна для пользователей с предыдущими подписками")
-                    
-                    # Новая подписка начинается с даты истечения старой
-                    start_date = cancelled_subscription['end_date']
-                    end_date = add_one_month_safe(start_date)
-                    next_payment_date = end_date
-
-                    query = """
-                        INSERT INTO subscriptions (user_id, order_id, start_date, end_date, next_payment_date, subscription_type)
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                        RETURNING subscription_id;
-                    """
-                    cursor.execute(query, (user_id, order_id, start_date, end_date, next_payment_date, subscription_type))
-                else:
-                    now = datetime.now()
-                    
-                    if subscription_type == 'test':
-                        # Тестовая подписка: 48 часов
-                        end_date = now + timedelta(hours=48)
-                    else:
-                        # Обычная подписка: 1 месяц
-                        end_date = add_one_month_safe(now)
-                    
-                    next_payment_date = end_date
-
-                    query = """
-                        INSERT INTO subscriptions (user_id, order_id, start_date, end_date, next_payment_date, subscription_type)
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                        RETURNING subscription_id;
-                    """
-                    cursor.execute(query, (user_id, order_id, now, end_date, next_payment_date, subscription_type))
-
-                subscription_id = cursor.fetchone()[0]
-                self.conn.commit()
-                return subscription_id
-
-        except Exception as e:
-            print(f"❌ Ошибка при создании подписки: {e}")
-            self.conn.rollback()
-            raise
-
-    def can_create_test_subscription(self, user_id: int) -> bool:
-        """
-        Проверяет, может ли пользователь создать тестовую подписку.
-        
-        :param user_id: Telegram user ID
-        :return: True, если пользователь может создать тестовую подписку
-        """
-        try:
-            # Проверяем, есть ли у пользователя какие-либо подписки
-            with self.conn.cursor() as cursor:
-                query = """
-                    SELECT EXISTS (
-                        SELECT 1 FROM subscriptions 
-                        WHERE user_id = %s
-                    )
-                """
-                cursor.execute(query, (user_id,))
-                has_any_subscription = cursor.fetchone()[0]
-                
-                return not has_any_subscription
-        except Exception as e:
-            print(f"❌ Ошибка при проверке возможности создания тестовой подписки: {e}")
-            return False
-
-    def create_test_subscription(self, user_id: int, order_id: int) -> int:
-        """
-        Создает тестовую подписку на 48 часов.
-
-        :param user_id: Telegram user ID
-        :param order_id: ID заказа
-        :return: subscription_id
-        """
-        return self.create_subscription(user_id, order_id, subscription_type='test')
-
-    def get_active_subscription(self, user_id: int):
-        """
-        Получает активную подписку пользователя.
-        
-        :param user_id: Telegram user ID
-        :return: Словарь с данными подписки или None
-        """
-        try:
-            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                query = """
-                    SELECT * FROM subscriptions 
-                    WHERE user_id = %s AND status = 'active'
-                    ORDER BY created_at DESC
-                    LIMIT 1
-                """
-                cursor.execute(query, (user_id,))
-                return cursor.fetchone()
-        except Exception as e:
-            print(f"❌ Ошибка при получении активной подписки: {e}")
-            return None
-
-    def get_cancelled_subscription(self, user_id: int):
-        """
-        Получает отмененную подписку пользователя с самой поздней датой истечения.
-        
-        :param user_id: Telegram user ID
-        :return: Словарь с данными подписки или None
-        """
-        try:
-            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                query = """
-                    SELECT * FROM subscriptions 
-                    WHERE user_id = %s AND status = 'cancelled' AND end_date > CURRENT_TIMESTAMP
-                    ORDER BY end_date DESC
-                    LIMIT 1
-                """
-                cursor.execute(query, (user_id,))
-                return cursor.fetchone()
-        except Exception as e:
-            print(f"❌ Ошибка при получении отмененной подписки: {e}")
-            return None
-
-    def update_subscription_status(self, subscription_id: int, status: str):
-        """
-        Обновляет статус подписки.
-        
-        :param subscription_id: ID подписки
-        :param status: Новый статус
-        """
-        try:
-            with self.conn.cursor() as cursor:
-                query = """
-                    UPDATE subscriptions 
-                    SET status = %s, updated_at = CURRENT_TIMESTAMP
-                    WHERE subscription_id = %s
-                """
-                cursor.execute(query, (status, subscription_id))
-                self.conn.commit()
-        except Exception as e:
-            print(f"❌ Ошибка при обновлении статуса подписки: {e}")
-            self.conn.rollback()
-            raise
-
-    def update_subscription_type(self, subscription_id: int, subscription_type: str):
-        """
-        Обновляет тип подписки.
-        
-        :param subscription_id: ID подписки
-        :param subscription_type: Новый тип подписки ('test' или 'regular')
-        """
-        try:
-            with self.conn.cursor() as cursor:
-                query = """
-                    UPDATE subscriptions 
-                    SET subscription_type = %s, updated_at = CURRENT_TIMESTAMP
-                    WHERE subscription_id = %s
-                """
-                cursor.execute(query, (subscription_type, subscription_id))
-                self.conn.commit()
-        except Exception as e:
-            print(f"❌ Ошибка при обновлении типа подписки: {e}")
-            self.conn.rollback()
-            raise
-
-    def extend_subscription(self, subscription_id: int):
-        """
-        Продлевает подписку на месяц.
-        
-        :param subscription_id: ID подписки
-        """
-        try:
-            with self.conn.cursor() as cursor:
-                # Получаем текущую дату следующего платежа
-                cursor.execute("""
-                    SELECT next_payment_date FROM subscriptions WHERE subscription_id = %s
-                """, (subscription_id,))
-                current_next_payment = cursor.fetchone()[0]
-                
-                # Вычисляем новую дату (то же число следующего месяца)
-                if current_next_payment.month == 12:
-                    # Если декабрь, то следующий месяц - январь следующего года
-                    new_next_payment = current_next_payment.replace(year=current_next_payment.year + 1, month=1)
-                else:
-                    # Иначе просто увеличиваем месяц
-                    new_next_payment = current_next_payment.replace(month=current_next_payment.month + 1)
-                
-                # Обновляем подписку, сбрасываем счетчик попыток и меняем тип на regular
-                query = """
-                    UPDATE subscriptions 
-                    SET end_date = end_date + INTERVAL '1 month',
-                        next_payment_date = %s,
-                        charge_attempts = 0,
-                        last_charge_attempt = NULL,
-                        subscription_type = 'regular',
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE subscription_id = %s
-                """
-                cursor.execute(query, (new_next_payment, subscription_id))
-                self.conn.commit()
-        except Exception as e:
-            print(f"❌ Ошибка при продлении подписки: {e}")
-            self.conn.rollback()
-            raise
-
-    def has_active_subscription(self, user_id: int) -> bool:
-        """
-        Проверяет, есть ли у пользователя активная подписка.
-        
-        :param user_id: Telegram user ID
-        :return: True, если есть активная подписка
-        """
-        try:
-            with self.conn.cursor() as cursor:
-                query = """
-                    SELECT EXISTS (
-                        SELECT 1 FROM subscriptions 
-                        WHERE user_id = %s AND status = 'active'
-                    )
-                """
-                cursor.execute(query, (user_id,))
-                return cursor.fetchone()[0]
-        except Exception as e:
-            print(f"❌ Ошибка при проверке активной подписки: {e}")
-            return False
-
-    def get_subscription_by_id(self, subscription_id: int):
-        """
-        Получает подписку по ID.
-        
-        :param subscription_id: ID подписки
-        :return: Словарь с данными подписки или None
-        """
-        try:
-            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                query = """
-                    SELECT * FROM subscriptions 
-                    WHERE subscription_id = %s
-                """
-                cursor.execute(query, (subscription_id,))
-                return cursor.fetchone()
-        except Exception as e:
-            print(f"❌ Ошибка при получении подписки: {e}")
-            return None
-
-    def get_all_active_subscriptions(self):
-        """
-        Получает все активные подписки.
-        
-        :return: Список активных подписок
-        """
-        try:
-            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                query = """
-                    SELECT * FROM subscriptions 
-                    WHERE status = 'active' AND end_date > CURRENT_TIMESTAMP
-                    ORDER BY next_payment_date ASC
-                """
-                cursor.execute(query)
-                return cursor.fetchall()
-        except Exception as e:
-            print(f"❌ Ошибка при получении активных подписок: {e}")
-            return []
-
-    def get_test_subscriptions(self):
-        """
-        Получает все активные тестовые подписки.
-        
-        :return: Список активных тестовых подписок
-        """
-        try:
-            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                query = """
-                    SELECT * FROM subscriptions 
-                    WHERE status = 'active' AND subscription_type = 'test' AND end_date > CURRENT_TIMESTAMP
-                    ORDER BY next_payment_date ASC
-                """
-                cursor.execute(query)
-                return cursor.fetchall()
-        except Exception as e:
-            print(f"❌ Ошибка при получении тестовых подписок: {e}")
-            return []
-
-    def get_regular_subscriptions(self):
-        """
-        Получает все активные обычные подписки.
-        
-        :return: Список активных обычных подписок
-        """
-        try:
-            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                query = """
-                    SELECT * FROM subscriptions 
-                    WHERE status = 'active' AND subscription_type = 'regular' AND end_date > CURRENT_TIMESTAMP
-                    ORDER BY next_payment_date ASC
-                """
-                cursor.execute(query)
-                return cursor.fetchall()
-        except Exception as e:
-            print(f"❌ Ошибка при получении обычных подписок: {e}")
-            return []
-
-    def get_user_ids_without_subscriptions(self) -> list[int]:
-        """
-        Возвращает список user_id всех пользователей, у которых нет активных подписок.
-
-        :return: список user_id
-        """
-        try:
-            with self.conn.cursor() as cursor:
-                query = """
-                    SELECT u.user_id
-                    FROM users u
-                    LEFT JOIN subscriptions s ON u.user_id = s.user_id
-                    WHERE s.user_id IS NULL
-                """
-                cursor.execute(query)
-                rows = cursor.fetchall()
-
-                # Преобразуем результат в список
-                user_ids = [row[0] for row in rows]
-
-                return user_ids
-        except Exception as e:
-            print(f"❌ Ошибка при получении пользователей без подписок: {e}")
-            return []
-
-    def schedule_job(self, user_id: int, subscription_id: int, job_type: str, run_at: datetime) -> int:
-        """
-        Создает задачу в scheduled_jobs для резерва.
-        
-        :param user_id: Telegram user ID
-        :param subscription_id: ID подписки
-        :param job_type: Тип задачи ('charge', 'kick', 'notify')
-        :param run_at: Время выполнения
-        :return: job_id
-        """
-        try:
-            with self.conn.cursor() as cursor:
-                query = """
-                    INSERT INTO scheduled_jobs (user_id, subscription_id, job_type, run_at)
-                    VALUES (%s, %s, %s, %s)
-                    RETURNING job_id;
-                """
-                cursor.execute(query, (user_id, subscription_id, job_type, run_at))
-                job_id = cursor.fetchone()[0]
-                self.conn.commit()
-                return job_id
-        except Exception as e:
-            print(f"❌ Ошибка при создании задачи в БД: {e}")
-            self.conn.rollback()
-            raise
-
-    def mark_job_done(self, job_id: int):
-        """
-        Отмечает задачу как выполненную.
-        
-        :param job_id: ID задачи
-        """
-        try:
-            with self.conn.cursor() as cursor:
-                query = """
-                    UPDATE scheduled_jobs 
-                    SET status = 'done', updated_at = CURRENT_TIMESTAMP
-                    WHERE job_id = %s
-                """
-                cursor.execute(query, (job_id,))
-                self.conn.commit()
-        except Exception as e:
-            print(f"❌ Ошибка при отметке задачи как выполненной: {e}")
-            self.conn.rollback()
-            raise
-
-    def cancel_job(self, job_id: int):
-        """
-        Отменяет задачу.
-        
-        :param job_id: ID задачи
-        """
-        try:
-            with self.conn.cursor() as cursor:
-                query = """
-                    UPDATE scheduled_jobs 
-                    SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
-                    WHERE job_id = %s
-                """
-                cursor.execute(query, (job_id,))
-                self.conn.commit()
-        except Exception as e:
-            print(f"❌ Ошибка при отмене задачи: {e}")
-            self.conn.rollback()
-            raise
-
-    def update_order_email(self, order_id: int, email: str):
-        """
-        Обновляет email в заказе.
-        
-        :param order_id: ID заказа
-        :param email: Email адрес
-        """
-        try:
-            with self.conn.cursor() as cursor:
-                query = """
-                    UPDATE orders 
-                    SET email = %s, updated_at = CURRENT_TIMESTAMP
-                    WHERE order_id = %s
-                """
-                cursor.execute(query, (email, order_id))
-                self.conn.commit()
-        except Exception as e:
-            print(f"❌ Ошибка при обновлении email заказа: {e}")
-            self.conn.rollback()
-            raise
-
-    def cancel_subscription(self, subscription_id: int):
-        """
-        Отменяет подписку.
-        
-        :param subscription_id: ID подписки
-        """
-        try:
-            with self.conn.cursor() as cursor:
-                query = """
-                    UPDATE subscriptions 
-                    SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
-                    WHERE subscription_id = %s
-                """
-                cursor.execute(query, (subscription_id,))
-                self.conn.commit()
-        except Exception as e:
-            print(f"❌ Ошибка при отмене подписки: {e}")
-            self.conn.rollback()
-            raise
-
-    def increment_charge_attempts(self, subscription_id: int):
-        """
-        Увеличивает счетчик попыток списания.
-        
-        :param subscription_id: ID подписки
-        """
-        try:
-            with self.conn.cursor() as cursor:
-                query = """
-                    UPDATE subscriptions 
-                    SET charge_attempts = charge_attempts + 1,
-                        last_charge_attempt = CURRENT_TIMESTAMP,
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE subscription_id = %s
-                """
-                cursor.execute(query, (subscription_id,))
-                self.conn.commit()
-        except Exception as e:
-            print(f"❌ Ошибка при увеличении счетчика попыток: {e}")
-            self.conn.rollback()
-            raise
-
-    def reset_charge_attempts(self, subscription_id: int):
-        """
-        Сбрасывает счетчик попыток списания.
-        
-        :param subscription_id: ID подписки
-        """
-        try:
-            with self.conn.cursor() as cursor:
-                query = """
-                    UPDATE subscriptions 
-                    SET charge_attempts = 0,
-                        last_charge_attempt = NULL,
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE subscription_id = %s
-                """
-                cursor.execute(query, (subscription_id,))
-                self.conn.commit()
-        except Exception as e:
-            print(f"❌ Ошибка при сбросе счетчика попыток: {e}")
-            self.conn.rollback()
-            raise
-
-    def get_charge_attempts(self, subscription_id: int) -> int:
-        """
-        Получает количество попыток списания.
-        
-        :param subscription_id: ID подписки
-        :return: Количество попыток
-        """
-        try:
-            with self.conn.cursor() as cursor:
-                query = """
-                    SELECT charge_attempts FROM subscriptions 
-                    WHERE subscription_id = %s
-                """
-                cursor.execute(query, (subscription_id,))
-                result = cursor.fetchone()
-                return result[0] if result else 0
-        except Exception as e:
-            print(f"❌ Ошибка при получении количества попыток: {e}")
-            return 0
-
-    def remove_user_from_channel(self, user_id: int):
-        """
-        Удаляет пользователя из канала (устанавливает статус подписки как expired).
-        
-        :param user_id: ID пользователя
-        """
-        try:
-            with self.conn.cursor() as cursor:
-                query = """
-                    UPDATE subscriptions 
-                    SET status = 'expired', updated_at = CURRENT_TIMESTAMP
-                    WHERE user_id = %s AND status = 'active'
-                """
-                cursor.execute(query, (user_id,))
-                self.conn.commit()
-        except Exception as e:
-            print(f"❌ Ошибка при удалении пользователя из канала: {e}")
-            self.conn.rollback()
-            raise
-
-    def get_first_payment_for_subscription(self, subscription_id: int):
-        """
-        Получает первый платеж для подписки (для рекуррентных списаний).
-        
-        :param subscription_id: ID подписки
-        :return: order_code первого платежа или None
-        """
-        try:
-            with self.conn.cursor() as cursor:
-                # Получаем order_id из подписки
-                cursor.execute("""
-                    SELECT order_id FROM subscriptions WHERE subscription_id = %s
-                """, (subscription_id,))
-                result = cursor.fetchone()
-                if not result:
-                    return None
-                
-                order_id = result[0]
-                
-                # Получаем order_code из заказа
-                cursor.execute("""
-                    SELECT order_code FROM orders WHERE order_id = %s
-                """, (order_id,))
-                result = cursor.fetchone()
-                return result[0] if result else None
-                
-        except Exception as e:
-            print(f"❌ Ошибка при получении первого платежа: {e}")
-            return None
-
-    def get_pending_job_by_subscription_and_type(self, subscription_id: int, job_type: str):
-        """
-        Получает ID последней ожидающей задачи по подписке и типу.
-        
-        :param subscription_id: ID подписки
-        :param job_type: Тип задачи ('charge', 'kick', 'notify')
-        :return: job_id или None
-        """
-        try:
-            with self.conn.cursor() as cursor:
-                cursor.execute("""
-                    SELECT job_id FROM scheduled_jobs 
-                    WHERE subscription_id = %s AND job_type = %s AND status = 'pending'
-                    ORDER BY created_at DESC LIMIT 1
-                """, (subscription_id, job_type))
-                result = cursor.fetchone()
-                return result[0] if result else None
-        except Exception as e:
-            print(f"❌ Ошибка при получении ожидающей задачи: {e}")
-            return None
-
-    def get_cancelled_and_expired_subscriptions(self):
-        """
-        Возвращает подписки со статусом 'cancelled', у которых end_date уже в прошлом/сейчас.
-        """
-        try:
-            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                query = """
-                    SELECT *
-                    FROM subscriptions
-                    WHERE (status = 'cancelled' OR status = 'expired')
-                      AND end_date <= CURRENT_TIMESTAMP
-                    ORDER BY end_date ASC;
-                """
-                cursor.execute(query)
-                return cursor.fetchall()
-        except Exception as e:
-            print(f"❌ Ошибка при получении отмененных и истекших подписок: {e}")
-            return []

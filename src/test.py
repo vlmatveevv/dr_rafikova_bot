@@ -48,7 +48,7 @@ admin_payment_notification_text = admin_template.render(
     income_amount=1190.0,
     user_id=user_info["user_id"],
     order_code=98787,
-    formatted_chapter="course"
+    formatted_chapter="ch_2"
 )
 
 print(admin_payment_notification_text)

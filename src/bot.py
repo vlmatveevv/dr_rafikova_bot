@@ -6,14 +6,12 @@ import traceback
 import html
 import re
 import time as time_new
-from datetime import time, datetime, timedelta, timezone
+from datetime import time, datetime, timedelta
 from pathlib import Path
-from typing import Optional, Union, IO
 
 import pytz
 import telegram
 import other_func
-from telegram_func import send_or_edit_message, send_or_edit_photo
 from setup import pdb
 import config
 import yaml
@@ -21,7 +19,6 @@ import keyboard as my_keyboard
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, BotCommand, ReplyKeyboardMarkup, \
     ReplyKeyboardRemove, KeyboardButton, InputMediaPhoto, InputMediaDocument
 from telegram.constants import ParseMode, ChatAction
-from telegram.error import RetryAfter
 from telegram.ext import (
     Application,
     ApplicationBuilder,
@@ -37,8 +34,6 @@ from telegram.ext import (
     filters)
 
 import payment
-from subscription_jobs import schedule_subscription_jobs, cancel_subscription_jobs, schedule_daily_sync, \
-    sync_job_queue_with_db
 
 # Установка русской локали
 locale.setlocale(locale.LC_TIME, ('ru_RU', 'UTF-8'))
@@ -84,6 +79,44 @@ async def user_exists_pdb(user_id: int) -> bool:
     return pdb.user_exists(user_id)
 
 
+async def send_or_edit_message(update: Update, context: CallbackContext, text: str,
+                               reply_markup: InlineKeyboardMarkup = None, new_message=False):
+    if new_message:
+        await context.bot.send_message(
+            chat_id=update.effective_user.id,
+            text=text,
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.HTML,
+            disable_web_page_preview=True
+        )
+        return
+    if update.callback_query:
+        if update.callback_query.message.text:
+            await update.callback_query.edit_message_text(
+                text=text,
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.HTML,
+                disable_web_page_preview=True
+            )
+        else:
+            await update.callback_query.message.delete()
+            await context.bot.send_message(
+                chat_id=update.effective_user.id,
+                text=text,
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.HTML,
+                disable_web_page_preview=True
+            )
+    else:
+        await context.bot.send_message(
+            chat_id=update.effective_user.id,
+            text=text,
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.HTML,
+            disable_web_page_preview=True
+        )
+
+
 async def register(update: Update, context: CallbackContext) -> int:
     user_id = update.effective_user.id
     first_name = update.effective_user.first_name or ""
@@ -94,36 +127,17 @@ async def register(update: Update, context: CallbackContext) -> int:
     if not await user_exists_pdb(user_id):
         pdb.add_user(user_id, username, first_name, last_name)
 
-    keyboard = [
-        [InlineKeyboardButton(config.bot_btn['buy_courses'], callback_data='pay_chapter')]
-        # [InlineKeyboardButton(config.bot_btn['test_sub'], callback_data='pay_chapter:test_sub')]
-    ]
+    keyboard = [[InlineKeyboardButton(config.bot_btn['buy_courses'], callback_data='buy_courses')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    caption = f"{config.bot_msg['hello'].format(first_name=first_name)}"
-    video_path = config.media_dir / "video.mp4"
-
-    try:
-        with open(video_path, 'rb') as video:
-            await context.bot.send_video_note(
-                chat_id=user_id,
-                video_note=video
-            )
-        await asyncio.sleep(3)
-    except telegram.error.BadRequest as e:
-        logger.info(f"Ошибка при отправке video note: {e}")
-        pass
-
-    await send_or_edit_message(update, context, caption, reply_markup, True)
+    await context.bot.send_message(
+        chat_id=user_id,
+        text=f"{config.bot_msg['hello'].format(first_name=first_name)}",
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.HTML
+    )
 
     return ConversationHandler.END
-
-
-async def start_callback_handle(update: Update, context: CallbackContext) -> None:
-    """Обработчик кнопки start из главного меню"""
-    query = update.callback_query
-    await query.answer()
-    await register(update, context)
 
 
 async def my_courses_command(update: Update, context: CallbackContext) -> None:
@@ -140,8 +154,14 @@ async def my_courses_command(update: Update, context: CallbackContext) -> None:
         await send_or_edit_message(update, context, text, reply_markup)
         return
 
-    keyboard = my_keyboard.ch_choose_button(available_courses=available_courses, menu_path=menu_path)
-    keyboard.extend(my_keyboard.main_menu_button_markup())
+    keyboard = []
+
+    for course_key in available_courses:
+        course = config.courses.get(course_key)
+        if course:
+            keyboard = my_keyboard.ch_choose_button(available_courses=available_courses, menu_path=menu_path)
+
+    keyboard.extend(my_keyboard.main_menu_button_markup())  # <-- исправлено
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     text = "Ваши доступные курсы. Нажмите, чтобы перейти:"
@@ -203,377 +223,18 @@ async def support_callback_handle(update: Update, context: CallbackContext) -> N
     await support_command(update, context)
 
 
-async def cancel_sub_command(update: Update, context: CallbackContext) -> None:
-    user_id = update.effective_user.id
-
-    # Проверяем, есть ли активная подписка
-    if not pdb.has_active_subscription(user_id):
-        text = "❌ У вас нет активной подписки для отмены."
-        await send_or_edit_message(update, context, text)
-        return
-
-    text = config.bot_msg['sub']['cancel']
-    keyboard = [
-        [InlineKeyboardButton(config.bot_btn['sub']['cancel'], callback_data="cancel_sub_confirm")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await send_or_edit_message(update, context, text, reply_markup)
-
-
-async def send_bulk_text_from_yaml(
-    update: Update,
-    context: CallbackContext,
-    user_ids: list[int],
-    batch_size: int = 50,
-    per_message_delay: float = 0.2,
-    between_batch_delay: float = 5.0,
-    *,
-    photo: Optional[Union[str, IO[bytes]]] = None,  # <-- Фото или None
-) -> None:
-    """
-    Массовая рассылка сообщений пользователям:
-    - Если передан `photo`, отправляем фото с caption = config.bot_msg['mailling'].
-    - Если фото не передано — отправляем обычное текстовое сообщение.
-    - Логируем RetryAfter и ошибки.
-    - Шлём промежуточные статусы админу после каждого батча.
-    """
-
-    admin_msg = update.effective_message
-
-    keyboard = [
-        [InlineKeyboardButton(config.bot_btn['main_menu']['start'], callback_data="start")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    # 1) Убираем дубликаты
-    # all_user_ids = list(dict.fromkeys(user_ids))
-    all_user_ids = user_ids
-
-    await admin_msg.reply_text(
-        f"Старт рассылки.\nПолучателей (уникальных): {len(all_user_ids)}"
-    )
-
-    # 2) Получаем текст для рассылки
-    try:
-        text = config.bot_msg['mailling']
-        if not isinstance(text, str):
-            raise ValueError("config.bot_msg['mailling'] должен быть строкой")
-    except Exception as e:
-        logger.exception("Не удалось загрузить текст из config: %s", e)
-        await admin_msg.reply_text(f"Ошибка загрузки текста: {e}")
-        return
-
-    # 3) Статистика
-    successful_sends = 0
-    failed_sends_count = 0
-
-    logger.info("Начало рассылки для %d пользователей.", len(all_user_ids))
-
-    # 4) Рассылка по батчам
-    for i in range(0, len(all_user_ids), batch_size):
-        batch = all_user_ids[i:i + batch_size]
-
-        for user_id in batch:
-            try:
-                if photo:
-                    # Отправляем фото с подписью
-                    await context.bot.send_photo(
-                        chat_id=user_id,
-                        photo=photo,
-                        caption=text,
-                        reply_markup=reply_markup,
-                        parse_mode=ParseMode.HTML
-                    )
-                else:
-                    # Отправляем обычное текстовое сообщение
-                    await context.bot.send_message(
-                        chat_id=user_id,
-                        text=text,
-                        reply_markup=reply_markup,
-                        parse_mode=ParseMode.HTML
-                    )
-
-                successful_sends += 1
-
-            except RetryAfter as e:
-                logger.warning("Flood control для %s: ждём %s сек", user_id, e.retry_after)
-                await asyncio.sleep(e.retry_after)
-                failed_sends_count += 1
-            except Exception as e:
-                logger.error("Ошибка для %s: %s", user_id, e)
-                failed_sends_count += 1
-
-            # задержка между сообщениями
-            await asyncio.sleep(per_message_delay)
-
-        # Промежуточный статус после каждого батча
-        await admin_msg.reply_text(
-            f"Батч завершён: {len(batch)} пользователей.\n"
-            f"Итого: ✅ {successful_sends}, ❌ {failed_sends_count}.\n"
-            f"Пауза {between_batch_delay:.1f} секунд."
-        )
-        await asyncio.sleep(between_batch_delay)
-
-    # 5) Итоговый отчёт
-    await admin_msg.reply_text(
-        f"Рассылка завершена ✅\nУспешно: {successful_sends}\nНе удалось: {failed_sends_count}"
-    )
-
-
-async def zxc_command(update: Update, context: CallbackContext) -> None:
-    user_id = update.message.from_user.id
-    test_ids = [146679674, 146679674]
-    user_ids_without_subscriptions = pdb.get_user_ids_without_subscriptions()
-    # await send_bulk_text_from_yaml(update, context, test_ids)
-
-    # Путь к фото
-    ref_path = config.media_dir / "mother.jpg"
-
-    # Открываем файл в бинарном режиме
-    await send_bulk_text_from_yaml(
-        update,
-        context,
-        test_ids,
-        photo=str(ref_path)
-    )
-
-    # keyboard = [
-    #     [InlineKeyboardButton(config.bot_btn['test_sub'], callback_data="test_sub")]
-    # ]
-    # reply_markup = InlineKeyboardMarkup(keyboard)
-    #
-    # if user_id not in test_ids:
-    #     await update.message.reply_text(text="test", reply_markup=reply_markup)
-    #     return
-
-
-async def test_sub_callback_handle(update: Update, context: CallbackContext) -> None:
-    """Обработчик кнопки test_sub для создания тестовой подписки"""
-    query = update.callback_query
-    user_id = query.from_user.id
-    
-    # # Проверяем, что пользователь в списке тестировщиков
-    # test_ids = [7768888247, 5738018066]
-    # if user_id not in test_ids:
-    #     await query.answer("❌ У вас нет прав для создания тестовой подписки")
-    #     return
-    
-    await query.answer()
-    
-    try:
-        # Проверяем, может ли пользователь создать тестовую подписку
-        if not pdb.can_create_test_subscription(user_id):
-            await query.edit_message_text(
-                text=config.bot_msg['test_sub']['not_available_history'],
-                reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("📲 Главное меню", callback_data="main_menu")
-                ]])
-            )
-            return
-        
-        # Проверяем, есть ли уже активная подписка
-        if pdb.has_active_subscription(user_id):
-            await query.edit_message_text(
-                text=config.bot_msg['test_sub']['not_available_active'],
-                reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("📲 Главное меню", callback_data="main_menu")
-                ]])
-            )
-            return
-        
-        # Создаем тестовый заказ
-        order_code = other_func.generate_order_number()
-        order_id = pdb.create_order(user_id=user_id, order_code=order_code)
-        
-        # Получаем email пользователя (если есть)
-        user_info = pdb.get_user_by_user_id(user_id)
-        email = 'ya.matveev116@ya.ru'
-        
-        # Создаем тестовый платеж
-        payment_url = payment.create_test_payment_robokassa(
-            email=email,
-            order_code=order_code,
-            order_id=order_id,
-            user_id=user_id
-        )
-        
-        # Создаем клавиатуру с кнопкой оплаты
-        keyboard = [
-            [InlineKeyboardButton("💳 Оплатить 1 рубль", url=payment_url)],
-            [InlineKeyboardButton("🚫 Отмена", callback_data="main_menu")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        await query.edit_message_text(
-            text=config.bot_msg['test_sub']['info'],
-            reply_markup=reply_markup
-        )
-        
-    except Exception as e:
-        logger.error(f"❌ Ошибка при создании тестовой подписки: {e}")
-        await query.edit_message_text(
-            text=config.bot_msg['test_sub']['error'],
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("📲 Главное меню", callback_data="main_menu")
-            ]])
-        )
-
-
-async def sync_jobs_command(update: Update, context: CallbackContext) -> None:
-    """Команда для ручной синхронизации job_queue с БД (только для админов)"""
-    user_id = update.message.from_user.id
-
-    # Проверяем, является ли пользователь админом
-    admin_ids = [146679674]
-    if user_id not in admin_ids:
-        await update.message.reply_text("❌ У вас нет прав для выполнения этой команды.")
-        return
-
-    try:
-        await sync_job_queue_with_db(context)
-        await update.message.reply_text("✅ Синхронизация job_queue с БД завершена!")
-    except Exception as e:
-        await update.message.reply_text(f"❌ Ошибка при синхронизации: {e}")
-
-
-async def jobs_list_command(update: Update, context: CallbackContext) -> None:
-    """Команда для просмотра задач в job_queue (только для админов)"""
-    user_id = update.message.from_user.id
-
-    # Проверяем, является ли пользователь админом
-    admin_ids = [146679674]
-    if user_id not in admin_ids:
-        await update.message.reply_text("❌ У вас нет прав для выполнения этой команды.")
-        return
-
-    try:
-        jobs = context.job_queue.jobs()
-
-        if not jobs:
-            await update.message.reply_text("📋 Очередь задач пуста")
-            return
-
-        # Фильтруем только задачи подписок
-        subscription_jobs = [job for job in jobs if
-                             job.name and (job.name.startswith("charge_") or job.name.startswith("kick_"))]
-
-        if not subscription_jobs:
-            await update.message.reply_text("📋 Задач подписок в очереди нет")
-            return
-
-        # Формируем сообщение с информацией о задачах
-        message = "📋 Задачи в job_queue:\n\n"
-
-        for i, job in enumerate(subscription_jobs, 1):
-            job_name = job.name or "Без имени"
-            job_data = job.data or {}
-
-            # Извлекаем информацию из данных задачи
-            user_id_job = job_data.get('user_id', 'N/A')
-            subscription_id = job_data.get('subscription_id', 'N/A')
-            order_id = job_data.get('order_id', 'N/A')
-
-            # Форматируем время выполнения
-            if hasattr(job, 'next_t'):
-                from datetime import datetime, timezone
-                next_run = job.next_t
-
-                # Проверяем тип next_t
-                if isinstance(next_run, (int, float)):
-                    # Если это timestamp
-                    next_run = datetime.fromtimestamp(next_run, tz=timezone.utc)
-                elif isinstance(next_run, datetime):
-                    # Если это уже datetime объект
-                    if next_run.tzinfo is None:
-                        next_run = next_run.replace(tzinfo=timezone.utc)
-                else:
-                    next_run = None
-
-                if next_run:
-                    next_run_str = next_run.strftime('%d.%m.%Y %H:%M:%S UTC')
-                else:
-                    next_run_str = "Не определено"
-            else:
-                next_run_str = "Не определено"
-
-            message += f"🔹 {i}. {job_name}\n"
-            message += f"   👤 User ID: {user_id_job}\n"
-            message += f"   📋 Subscription ID: {subscription_id}\n"
-            if order_id != 'N/A':
-                message += f"   🛒 Order ID: {order_id}\n"
-            message += f"   ⏰ Следующий запуск: {next_run_str}\n\n"
-
-        # Если сообщение слишком длинное, разбиваем на части
-        if len(message) > 3800:
-            parts = [message[i:i + 3800] for i in range(0, len(message), 3800)]
-            for i, part in enumerate(parts, 1):
-                await update.message.reply_text(f"{part}\n\nЧасть {i}/{len(parts)}")
-        else:
-            await update.message.reply_text(message)
-
-    except Exception as e:
-        await update.message.reply_text(f"❌ Ошибка при получении списка задач: {e}")
-
-
-async def cancel_sub_confirm_callback(update: Update, context: CallbackContext) -> None:
-    text = config.bot_msg['sub']['cancel_confirm']
-    keyboard = [
-        [
-            InlineKeyboardButton(config.bot_btn['sub']['confirm_cancel'], callback_data="cancel_sub_final"),
-            InlineKeyboardButton(config.bot_btn['sub']['keep'], callback_data="cancel_sub_keep")
-        ]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await send_or_edit_message(update, context, text, reply_markup)
-
-
-async def cancel_sub_final_callback(update: Update, context: CallbackContext) -> None:
-    user_id = update.callback_query.from_user.id
-
-    try:
-        # Получаем активную подписку
-        subscription = pdb.get_active_subscription(user_id)
-        if not subscription:
-            text = "❌ Активная подписка не найдена."
-            await send_or_edit_message(update, context, text)
-            return
-
-        # Отменяем подписку
-        pdb.cancel_subscription(subscription['subscription_id'])
-
-        # Отменяем задачи в job_queue
-        cancel_subscription_jobs(context, subscription['subscription_id'], user_id)
-
-        text = config.bot_msg['sub']['canceled']
-        await send_or_edit_message(update, context, text)
-
-    except Exception as e:
-        logger.error(f"❌ Ошибка при отмене подписки: {e}")
-        text = "❌ Произошла ошибка при отмене подписки. Попробуйте позже."
-        await send_or_edit_message(update, context, text)
-
-
-async def cancel_sub_keep_callback(update: Update, context: CallbackContext) -> None:
-    text = config.bot_msg['sub']['cancel_keep']
-    await send_or_edit_message(update, context, text)
-
-
-async def cancel_sub_menu_callback(update: Update, context: CallbackContext) -> None:
-    """Обработчик кнопки отмены подписки из главного меню"""
-    # Просто вызываем существующую функцию
-    await cancel_sub_command(update, context)
-
-
 async def main_menu_callback_handle(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
     await query.answer()
-    text = "📲 Главное меню"
-    reply_markup = my_keyboard.main_menu_items_button_markup()
-    await send_or_edit_message(update, context, text, reply_markup)
+    await query.edit_message_text(
+        text="📲 Главное меню",
+        reply_markup=my_keyboard.main_menu_items_button_markup(),
+        parse_mode=ParseMode.HTML
+    )
 
 
 async def buy_courses_command(update: Update, context: CallbackContext) -> None:
-    keyboard = my_keyboard.ch_choose_button(menu_path='default')
+    keyboard = my_keyboard.ch_choose_button(menu_path = 'default')
 
     keyboard.extend(my_keyboard.buy_multiply_button_markup())
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -586,6 +247,14 @@ async def buy_courses_callback_handle(update: Update, context: CallbackContext) 
     query = update.callback_query
     await query.answer()
     await buy_courses_command(update, context)
+    # keyboard = my_keyboard.ch_choose_button()
+    # keyboard.extend(my_keyboard.buy_multiply_button_markup())
+    # reply_markup = InlineKeyboardMarkup(keyboard)
+    # await query.edit_message_text(
+    #     text=config.bot_msg['choose_chapter'],
+    #     reply_markup=reply_markup,
+    #     parse_mode=ParseMode.HTML
+    # )
 
 
 # Детали конкретного курса
@@ -594,18 +263,17 @@ async def buy_chapter_callback_handle(update: Update, context: CallbackContext) 
     await query.answer()
     user_id = query.from_user.id
 
-    # У нас только один курс
-    course_key = 'course'
+    num_of_chapter = query.data.split(':')[1]
     try:
-        menu_path = query.data.split(':')[1]
+        menu_path = query.data.split(':')[2]
     except Exception:
         menu_path = 'default'
 
-    course = config.courses.get(course_key)
+    chapter_mask = f'ch_{num_of_chapter}'
+    course = config.courses.get(chapter_mask)
 
     if not course:
-        text = "Курс не найден."
-        await send_or_edit_message(update, context, text)
+        await query.edit_message_text("Раздел не найден.")
         return
 
     text = config.bot_msg['buy_chapter_info'].format(
@@ -616,13 +284,13 @@ async def buy_chapter_callback_handle(update: Update, context: CallbackContext) 
 
     keyboard = []
 
-    if pdb.has_active_subscription(user_id) or pdb.has_manual_access(user_id, course_key):
+    if pdb.has_paid_course(user_id, chapter_mask) or pdb.has_manual_access(user_id, chapter_mask):
         keyboard.append([
             InlineKeyboardButton(config.bot_btn['go_to_channel'], url=course['channel_invite_link'])
         ])
     else:
         keyboard.append([
-            InlineKeyboardButton(config.bot_btn['go_to_pay'], callback_data='pay_chapter')
+            InlineKeyboardButton(config.bot_btn['go_to_pay'], callback_data=f'pay_chapter:{num_of_chapter}')
         ])
 
     keyboard.append([
@@ -630,12 +298,12 @@ async def buy_chapter_callback_handle(update: Update, context: CallbackContext) 
     ])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await send_or_edit_message(update, context, text, reply_markup)
-
-
-async def pay_chapter_test_callback_handle(update: Update, context: CallbackContext) -> None:
-    query = update.callback_query
-    await query.answer("Продажа пробных подписок завершена")
+    await query.edit_message_text(
+        text=text,
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.HTML,
+        disable_web_page_preview=True
+    )
 
 
 # Переход к оплате
@@ -644,65 +312,37 @@ async def pay_chapter_callback_handle(update: Update, context: CallbackContext) 
     await query.answer()
     user_id = query.from_user.id
 
-    # Проверяем, это тестовая подписка или обычная
-    is_test_subscription = False
-    if ':' in query.data:
-        parts = query.data.split(':')
-        if len(parts) > 1 and parts[1] == 'test_sub':
-            is_test_subscription = True
-
-    # У нас только один курс
-    course_key = 'course'
-    course = config.courses.get(course_key)
+    num_of_chapter = query.data.split(':')[1]
+    course_mask = f'ch_{num_of_chapter}'
+    course = config.courses.get(course_mask)
 
     if not course:
-        text = "Курс не найден."
-        await send_or_edit_message(update, context, text)
+        await query.edit_message_text("Курс не найден.")
         return ConversationHandler.END
-
-    # Проверяем, есть ли уже активная подписка
-    if pdb.has_active_subscription(user_id):
-        text = (
-            "У вас уже есть активная подписка! "
-            "Для отмены текущей подписки нажмите кнопку ниже."
-        )
-
-        reply_markup = InlineKeyboardMarkup([
-            [InlineKeyboardButton(config.bot_btn['sub']['cancel'], callback_data='cancel_sub')]
-        ])
-
-        await send_or_edit_message(update, context, text, reply_markup)
-        return ConversationHandler.END
-    else:
-        text = (
-            "Продажи доступа завершены"
-        )
-        await send_or_edit_message(update, context, text)
-        return ConversationHandler.END
-    # Для тестовых подписок проверяем права
-    if is_test_subscription:
-        # Проверяем, может ли пользователь создать тестовую подписку
-        if not pdb.can_create_test_subscription(user_id):
-            await query.edit_message_text(
-                text=config.bot_msg['test_sub']['not_available_history'],
-                reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("📲 Главное меню", callback_data="main_menu")
-                ]])
-            )
-            return ConversationHandler.END
 
     order_code = other_func.generate_order_number()
-    order_id = pdb.create_order(user_id=user_id, order_code=order_code)
+    order_id = pdb.create_order(user_id=user_id, course_chapter=[course_mask], order_code=order_code)
     context.user_data['selected_course'] = course
-    context.user_data['course_key'] = course_key
+    context.user_data['chapter_number'] = num_of_chapter
     context.user_data['order_id'] = order_id
-    context.user_data['order_code'] = order_code
-    context.user_data['is_test_subscription'] = is_test_subscription
 
     context.user_data['is_in_conversation'] = True
 
-    # Убираем дублирование - сообщение будет отправлено в start_payment_handle
-    return await start_payment_handle(update, context, [course_key])
+    keyboard = [
+        [InlineKeyboardButton("✅ Принимаю", callback_data=f"agree_offer:{order_code}")],
+        [InlineKeyboardButton("🚫 Отмена", callback_data='cancel')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await query.edit_message_text(
+        text="📄 Я ознакомился и принимаю условия Публичной оферты.\n\n"
+             f'<a href="{config.other_cfg["links"]["offer"]}">Открыть оферту</a>',
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.HTML,
+        disable_web_page_preview=True
+    )
+    # return AGREE_OFFER
+    return await start_payment_handle(update, context, [course_mask])
 
 
 async def confirm_multi_buy_handle(update: Update, context: CallbackContext) -> int:
@@ -713,8 +353,7 @@ async def confirm_multi_buy_handle(update: Update, context: CallbackContext) -> 
     user_id = query.from_user.id
 
     if not selected_courses:
-        text = "❗️Вы не выбрали ни одного курса."
-        await send_or_edit_message(update, context, text)
+        await query.edit_message_text("❗️Вы не выбрали ни одного курса.")
         return ConversationHandler.END
 
     context.user_data['is_in_conversation'] = True
@@ -728,14 +367,12 @@ async def start_payment_handle(update: Update, context: CallbackContext, selecte
     query = update.callback_query
     user_id = query.from_user.id
 
-    # У нас только один курс
-    course_key = 'course'
-    
-    # Данные заказа уже созданы в pay_chapter_callback_handle
-    order_id = context.user_data['order_id']
-    order_code = context.user_data['order_code']
+    order_code = other_func.generate_order_number()
+    order_id = pdb.create_order(user_id=user_id, course_chapter=selected_courses, order_code=order_code)
 
-    context.user_data['selected_courses'] = [course_key]
+    context.user_data['selected_courses'] = selected_courses
+    context.user_data['order_id'] = order_id
+    context.user_data['order_code'] = order_code
 
     keyboard = [
         [InlineKeyboardButton("✅ Принимаю", callback_data=f"agree_offer:{order_code}")],
@@ -743,24 +380,13 @@ async def start_payment_handle(update: Update, context: CallbackContext, selecte
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # Определяем текст в зависимости от типа подписки
-    is_test_subscription = context.user_data.get('is_test_subscription', False)
-    if is_test_subscription:
-        text = (
-            "💳 Пробная подписка оформляется на 2 дня с автоматическим продлением на полную подписку.\n"
-            "Ты можешь отменить её в любой момент.\n\n"
-            "📄 Я ознакомился и принимаю условия Публичной оферты.\n\n"
-            f'<a href="{config.other_cfg["links"]["offer"]}">Открыть оферту</a>'
-        )
-    else:
-        text = (
-            "💳 Подписка оформляется на 1 месяц с автоматическим продлением.\n"
-            "Ты можешь отменить её в любой момент.\n\n"
-            "📄 Я ознакомился и принимаю условия Публичной оферты.\n\n"
-            f'<a href="{config.other_cfg["links"]["offer"]}">Открыть оферту</a>'
-        )
-    
-    await send_or_edit_message(update, context, text, reply_markup)
+    await query.edit_message_text(
+        text="📄 Я ознакомился и принимаю условия Публичной оферты.\n\n"
+             f'<a href="{config.other_cfg["links"]["offer"]}">Открыть оферту</a>',
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.HTML,
+        disable_web_page_preview=True
+    )
     return AGREE_OFFER
 
 
@@ -776,11 +402,13 @@ async def handle_offer_agree(update: Update, context: CallbackContext) -> int:
                 [InlineKeyboardButton("🚫 Отмена", callback_data='cancel')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    text = (
-        '🔐 Я даю согласие на обработку моих персональных данных.\n\n'
-        f'<a href="{config.other_cfg["links"]["privacy"]}">Политика обработки данных</a>'
+    await query.edit_message_text(
+        text='🔐 Я даю согласие на обработку моих персональных данных.\n\n'
+             f'<a href="{config.other_cfg["links"]["privacy"]}">Политика обработки данных</a>',
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.HTML,
+        disable_web_page_preview=True
     )
-    await send_or_edit_message(update, context, text, reply_markup)
     return AGREE_PRIVACY
 
 
@@ -798,11 +426,13 @@ async def handle_privacy_agree(update: Update, context: CallbackContext) -> int:
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    text = (
-        "📬 Я даю согласие на получение рекламной и информационной рассылки.\n\n"
-        f'<a href="{config.other_cfg["links"]["consent"]}">Документ о рассылке</a>'
+    await query.edit_message_text(
+        text="📬 Я даю согласие на получение рекламной и информационной рассылки.\n\n"
+             f'<a href="{config.other_cfg["links"]["consent"]}">Документ о рассылке</a>',
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.HTML,
+        disable_web_page_preview=True
     )
-    await send_or_edit_message(update, context, text, reply_markup)
     return AGREE_NEWSLETTER
 
 
@@ -820,8 +450,8 @@ async def handle_newsletter_agree(update: Update, context: CallbackContext) -> i
         [InlineKeyboardButton("🚫 Отмена", callback_data='cancel')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    text = "📧 Введите ваш e-mail для отправки чека:"
-    email_msg = await send_or_edit_message(update, context, text, reply_markup)
+    email_msg = await query.edit_message_text(text="📧 Введите ваш e-mail для отправки чека:",
+                                              reply_markup=reply_markup)
     pdb.update_agreed_newsletter(order_code, agreement_newsletter_bool)
 
     context.user_data['email_msg'] = email_msg
@@ -859,58 +489,40 @@ async def ask_email_handle(update: Update, context: CallbackContext) -> int:
     except Exception as e:
         logger.error(f"Ошибка удаления сообщения: {e}")
 
-    # Определяем тип подписки и цену
-    is_test_subscription = context.user_data.get('is_test_subscription', False)
-    
-    # Для обычных подписок
     text_lines = [config.bot_msg['confirm_purchase_header'].format(email=email)]
-
-    course = config.courses['course']
-
-    if is_test_subscription:
-        text_lines.append(config.bot_msg['confirm_purchase_type_line_test'])
-        price = course['test_price']
-    else:
-        text_lines.append(config.bot_msg['confirm_purchase_type_line_regular'])
-        price = course['price']
+    # Заголовок
 
     # Каждая строка курса
-    # total_price = 0
-    # for course_key in selected_courses:
-    course = config.courses['course']
-    line = config.bot_msg['confirm_purchase_course_line'].format(
-        name=course['name'] + course['emoji'],
-        price=price
-    )
-    text_lines.append(line)
+    total_price = 0
+    for course_key in selected_courses:
+        course = config.courses[course_key]
+        line = config.bot_msg['confirm_purchase_course_line'].format(
+            name=course['name'] + course['emoji'],
+            price=course['price']
+        )
+        text_lines.append(line)
+        total_price += course['price']
 
     # Итог
-    text_lines.append(config.bot_msg['confirm_purchase_footer'].format(total=price))
+    text_lines.append(config.bot_msg['confirm_purchase_footer'].format(total=total_price))
 
     text = "\n".join(text_lines)
-    
-    # Создаём платёж
-    if is_test_subscription:
-        payment_url = payment.create_test_payment_robokassa(
-            email=email,
-            order_code=order_code,
-            order_id=order_id,
-            user_id=user_id
-        )
-    else:
-        payment_url = payment.create_payment_robokassa(
-            price=price,
-            email=email,
-            num_of_chapter=",".join(selected_courses),
-            order_code=order_code,
-            order_id=order_id,
-            user_id=user_id)
+
+    # Создаём платёж (убедись, что функция поддерживает многокурсовую оплату)
+    payment_url = payment.create_payment_robokassa(
+        price=total_price,
+        email=email,
+        num_of_chapter=",".join([key.split('_')[1] for key in selected_courses]),
+        order_code=order_code,
+        order_id=order_id,
+        user_id=user_id)
 
     keyboard = [
         [InlineKeyboardButton("✅ Подтвердить и оплатить", url=payment_url)],
         [InlineKeyboardButton("🚫 Отмена", callback_data='main_menu')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
+
     payment_message = await update.message.chat.send_message(
         text=text,
         reply_markup=reply_markup,
@@ -933,8 +545,8 @@ async def cancel_payment_handle(update: Update, context: CallbackContext) -> int
         [InlineKeyboardButton("📲 Главное меню", callback_data='main_menu')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    text = "Покупка отменена. Возвращайтесь позже."
-    await send_or_edit_message(update, context, text, reply_markup)
+    await query.edit_message_text(text="Покупка отменена. Возвращайтесь позже.",
+                                  reply_markup=reply_markup)
     return ConversationHandler.END
 
 
@@ -944,6 +556,7 @@ async def buy_multiply_callback_handle(update: Update, context: CallbackContext)
 
     user_id = query.from_user.id
     not_bought_courses = pdb.get_not_bought_courses(user_id)
+    not_bought_courses = [ch for ch in not_bought_courses if ch != "ch_1"]
 
     if not not_bought_courses:
         text = "Вы уже приобрели все доступные курсы."
@@ -960,9 +573,13 @@ async def buy_multiply_callback_handle(update: Update, context: CallbackContext)
         keyboard += my_keyboard.buy_multiply_menu_items_button()
         keyboard.extend(my_keyboard.main_menu_button_markup())
         reply_markup = InlineKeyboardMarkup(keyboard)
-        text = "Выберите курсы, которые хотите купить. Нажмите ещё раз, чтобы снять выбор."
+        text = "Выберите разделы, которые хотите купить. Нажмите ещё раз, чтобы снять выбор."
 
-    await send_or_edit_message(update, context, text, reply_markup)
+    await query.edit_message_text(
+        text=text,
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.HTML
+    )
 
 
 async def toggle_multi_buy_chapter(update: Update, context: CallbackContext) -> None:
@@ -970,19 +587,21 @@ async def toggle_multi_buy_chapter(update: Update, context: CallbackContext) -> 
     await query.answer()
 
     user_id = query.from_user.id
-    data = query.data  # Пример: "multi_buy_chapter:default"
-    course_key = 'course'  # У нас только один курс
+    data = query.data  # Пример: "multi_buy_chapter:1"
+    chapter_num = data.split(":")[1]
+    chapter_key = f"ch_{chapter_num}"
 
     selected = context.user_data.get("multi_buy_selected", [])
 
-    if course_key in selected:
-        selected.remove(course_key)
+    if chapter_key in selected:
+        selected.remove(chapter_key)
     else:
-        selected.append(course_key)
+        selected.append(chapter_key)
 
     context.user_data["multi_buy_selected"] = selected
 
     not_bought_courses = pdb.get_not_bought_courses(user_id)
+    not_bought_courses = [ch for ch in not_bought_courses if ch != "ch_7"]
 
     keyboard = my_keyboard.ch_choose_button(
         available_courses=not_bought_courses,
@@ -993,8 +612,11 @@ async def toggle_multi_buy_chapter(update: Update, context: CallbackContext) -> 
     keyboard.extend(my_keyboard.main_menu_button_markup())
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    text = "Выберите курсы, которые хотите купить. Нажмите ещё раз, чтобы снять выбор."
-    await send_or_edit_message(update, context, text, reply_markup)
+    await query.edit_message_text(
+        text="Выберите разделы, которые хотите купить. Нажмите ещё раз, чтобы снять выбор.",
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.HTML
+    )
 
 
 async def clear_selected_multi_buy_callback_handle(update: Update, context: CallbackContext) -> None:
@@ -1010,18 +632,17 @@ async def upd_payment_url_handle(update: Update, context: CallbackContext) -> No
     order_code = data.split(':')[1]
     order_data = pdb.get_order_by_code(int(order_code))
 
-    # У нас только один курс
-    course = config.courses.get('course')
+    course = config.courses.get(order_data['course_chapter'])
     user_id = order_data['user_id']
     email = order_data['email']
-    course_key = 'course'
+    num = order_data['course_chapter'].split('_')[1]
     order_id = order_data['order_id']
 
     payment_url = await payment.create_payment(
         price=course['price'],
         user_id=user_id,
         email=email,
-        num_of_chapter=course_key,
+        num_of_chapter=num,
         order_id=order_id,
         order_code=order_code
     )
@@ -1030,13 +651,16 @@ async def upd_payment_url_handle(update: Update, context: CallbackContext) -> No
         [InlineKeyboardButton("✅ Подтвердить и оплатить", url=payment_url)]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    text = config.bot_msg['confirm_purchase'].format(
-        email=email,
-        name=course['name'] + course['emoji'],
-        num=course_key,
-        price=course['price'],
+    payment_message = await query.edit_message_text(
+        text=config.bot_msg['confirm_purchase'].format(
+            email=email,
+            name=course['name'] + course['emoji'],
+            num=num,
+            price=course['price'],
+        ),
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.HTML
     )
-    payment_message = await send_or_edit_message(update, context, text, reply_markup)
 
     payment_message_id = payment_message.message_id
     pdb.update_payment_message_id(order_code, payment_message_id)
@@ -1046,49 +670,37 @@ async def handle_join_request(update: Update, context: CallbackContext):
     join_request = update.chat_join_request
     user_id = join_request.from_user.id
     chat_id = update.chat_join_request.chat.id
-
-    logger.info(f"🔄 Получен запрос на вступление от пользователя {user_id} в чат {chat_id}")
-
-    # if user_id == 7768888247:
-    #     user_id = 146679674
-    # if user_id == 146679674:
-    #     await join_request.approve()
-    #     return
+    if user_id == 146679674:
+        await join_request.approve()
+        return
     channel_data = config.channel_map.get(chat_id)
-
-    logger.info(f"📊 channel_data для {chat_id}: {channel_data}")
 
     if channel_data:
         name = channel_data.get('name')
         channel_invite_link = channel_data.get('channel_invite_link')
-        group_invite_link = channel_data.get('group_invite_link')
     else:
         return
 
-    # У нас только один курс
-    course_key = 'course'
+    course_key = config.channel_id_to_key.get(chat_id)
     logger.info(f"course_key! = {course_key}")
 
-    # Проверяем активную подписку или ручной доступ
-    if pdb.has_manual_access(user_id, course_key) or pdb.has_active_subscription(user_id):
+    if pdb.has_manual_access(user_id, course_key) or pdb.has_paid_course(user_id, course_key):
         await join_request.approve()
         keyboard = [
             [InlineKeyboardButton("✅ Перейти в канал", url=channel_invite_link)],
-            [InlineKeyboardButton("✅ Вступить в группу", url=group_invite_link)]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await context.bot.send_message(
             chat_id=user_id,
-            text=config.bot_msg['channel_access_granted'].format(channel_name=name),
-            parse_mode=ParseMode.HTML,
+            text=f"Для перехода в канал ({name}) нажмите на кнопку ниже",
             reply_markup=reply_markup
         )
-        logger.info(f"✅ Одобрен вход для пользователя {user_id}")
+        logger.info(f"✅ Одобрен вход для {allowed_users[user_id]} ({user_id})")
     else:
         await join_request.decline()
         keyboard = [
-            [InlineKeyboardButton("✅ Выдать доступ", callback_data=f"grant_access:{user_id}:course")],
-            [InlineKeyboardButton("❌ Не выдавать доступ", callback_data=f"deny_access:{user_id}:course")]
+            [InlineKeyboardButton("✅ Выдать доступ", callback_data=f"grant_access:{user_id}:{course_key}")],
+            [InlineKeyboardButton("❌ Не выдавать доступ", callback_data=f"deny_access:{user_id}:{course_key}")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await context.bot.send_message(
@@ -1106,27 +718,23 @@ async def grant_manual_access_handle(update: Update, context: CallbackContext):
     _, user_id_str, course_key = query.data.split(":")
     user_id = int(user_id_str)
     admin_id = query.from_user.id
-    course = config.courses.get('course')
+    course = config.courses.get(course_key)
     name = course['name'] + course['emoji']
     # Добавим доступ в manual_access
     try:
-        pdb.grant_manual_access(user_id=user_id, granted_by=admin_id)
-        text = (
-            f"✅ Доступ пользователю {user_id} к курсу {name} успешно выдан. Теперь ему нужно заново перейти в канал."
-        )
-        await send_or_edit_message(update, context, text)
+        pdb.grant_manual_access(user_id=user_id, course_chapter=course_key, granted_by=admin_id)
+        await query.edit_message_text(
+            f"✅ Доступ пользователю {user_id} к курсу {name} успешно выдан. Теперь ему нужно заново перейти в канал.")
     except Exception as e:
         logger.error(f"❌ Ошибка выдачи доступа: {e}")
-        text = "❌ Ошибка при попытке выдать доступ."
-        await send_or_edit_message(update, context, text)
+        await query.edit_message_text("❌ Ошибка при попытке выдать доступ.")
 
 
 async def deny_manual_access(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()
     _, user_id_str, course_key = query.data.split(":")
-    text = f"⛔️ Вы отказали в доступе пользователю {user_id_str} к курсу."
-    await send_or_edit_message(update, context, text)
+    await query.edit_message_text(f"⛔️ Вы отказали в доступе пользователю {user_id_str} к курсу {course_key}.")
 
 
 async def go_back_callback_handle(update: Update, context: CallbackContext) -> None:
@@ -1187,7 +795,7 @@ async def post_init(application: Application) -> None:
 
 buy_course_conversation = ConversationHandler(
     entry_points=[
-        CallbackQueryHandler(pay_chapter_callback_handle, pattern="^pay_chapter$"),
+        CallbackQueryHandler(pay_chapter_callback_handle, pattern="^pay_chapter:"),
         CallbackQueryHandler(confirm_multi_buy_handle, pattern="^confirm_buy_multiply$")
     ],
     states={
@@ -1223,50 +831,35 @@ def run():
         .build()
     )
 
-    # Запускаем ежедневную синхронизацию job_queue с БД
-    schedule_daily_sync(application)
-
     application.add_handler(CommandHandler('start', register))
-    # application.add_handler(CommandHandler('my_courses', my_courses_command))
-    # application.add_handler(CommandHandler('all_courses', all_courses_command))
+    application.add_handler(CommandHandler('my_courses', my_courses_command))
+    application.add_handler(CommandHandler('all_courses', all_courses_command))
     application.add_handler(CommandHandler('documents', documents_command))
     application.add_handler(CommandHandler('support', support_command))
-    application.add_handler(CommandHandler('cancel_sub', cancel_sub_command))
-    application.add_handler(CommandHandler('zxc', zxc_command))
-    application.add_handler(CommandHandler('sync_jobs', sync_jobs_command))
-    application.add_handler(CommandHandler('jobs_list', jobs_list_command))
 
-    application.add_handler(CallbackQueryHandler(start_callback_handle, pattern="^start$"))
     application.add_handler(CallbackQueryHandler(buy_courses_callback_handle, pattern="^buy_courses$"))
-    application.add_handler(CallbackQueryHandler(buy_chapter_callback_handle, pattern="^buy_chapter$"))
-    application.add_handler(CallbackQueryHandler(pay_chapter_test_callback_handle, pattern="^pay_chapter:test_sub"))
+    application.add_handler(CallbackQueryHandler(buy_chapter_callback_handle, pattern="^buy_chapter:"))
 
-    # application.add_handler(CallbackQueryHandler(buy_multiply_callback_handle, pattern="^buy_multiply$"))
+    application.add_handler(CallbackQueryHandler(buy_multiply_callback_handle, pattern="^buy_multiply$"))
 
-    # application.add_handler(CallbackQueryHandler(toggle_multi_buy_chapter, pattern="^multi_buy_chapter:"))
+    application.add_handler(CallbackQueryHandler(toggle_multi_buy_chapter, pattern="^multi_buy_chapter:"))
 
     application.add_handler(CallbackQueryHandler(go_back_callback_handle, pattern="^go_back:"))
 
-    # application.add_handler(CallbackQueryHandler(clear_selected_multi_buy_callback_handle,
-    #                                              pattern="^clear_buy_multiply$"))
+    application.add_handler(CallbackQueryHandler(clear_selected_multi_buy_callback_handle,
+                                                 pattern="^clear_buy_multiply$"))
 
     application.add_handler(CallbackQueryHandler(upd_payment_url_handle, pattern="^upd_payment_url:"))
 
     application.add_handler(CallbackQueryHandler(main_menu_callback_handle, pattern="^main_menu$"))
     application.add_handler(CallbackQueryHandler(my_courses_callback_handle, pattern="^my_courses$"))
-    # application.add_handler(CallbackQueryHandler(all_courses_callback_handle,
-    #                                              pattern=r"^(all_courses|go_back_buy_multiply)$"))
+    application.add_handler(CallbackQueryHandler(all_courses_callback_handle,
+                                                 pattern=r"^(all_courses|go_back_buy_multiply)$"))
     application.add_handler(CallbackQueryHandler(documents_callback_handle, pattern="^documents$"))
     application.add_handler(CallbackQueryHandler(support_callback_handle, pattern="^support$"))
 
     application.add_handler(CallbackQueryHandler(grant_manual_access_handle, pattern="^grant_access:"))
     application.add_handler(CallbackQueryHandler(deny_manual_access, pattern="^deny_access:"))
-
-    application.add_handler(CallbackQueryHandler(cancel_sub_confirm_callback, pattern="^cancel_sub_confirm$"))
-    application.add_handler(CallbackQueryHandler(cancel_sub_final_callback, pattern="^cancel_sub_final$"))
-    application.add_handler(CallbackQueryHandler(cancel_sub_keep_callback, pattern="^cancel_sub_keep$"))
-    application.add_handler(CallbackQueryHandler(cancel_sub_menu_callback, pattern="^cancel_sub$"))
-    application.add_handler(CallbackQueryHandler(test_sub_callback_handle, pattern="^test_sub$"))
 
     application.add_handler(buy_course_conversation)
     application.add_handler(ChatJoinRequestHandler(handle_join_request))

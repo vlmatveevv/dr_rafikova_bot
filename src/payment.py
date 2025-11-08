@@ -1,19 +1,7 @@
 import config
 from yookassa import Configuration, Payment
-from robokassa.robokassa import HashAlgorithm, Robokassa
-from robokassa.robokassa.types import InvoiceType
-import logging
-
-# Настройка формата и уровня логгирования
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
-# Создание логгера
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-# Получите логгер для модуля 'httpx'
-logger_for_httpx = logging.getLogger('httpx')
-# Установите уровень логирования на WARNING, чтобы скрыть INFO и DEBUG сообщения
-logger_for_httpx.setLevel(logging.WARNING)
-
+from robokassa import HashAlgorithm, Robokassa
+from robokassa.types import InvoiceType
 
 robokassa = Robokassa(
     merchant_login=config.config_env['MERCHANT_LOGIN_ROBOKASSA'],
@@ -28,7 +16,8 @@ Configuration.secret_key = config.config_env['SECRET_KEY']
 
 
 async def create_payment(price, user_id, email, num_of_chapter, order_id, order_code):
-    course = config.courses.get(num_of_chapter)
+    formatted_chapter = f'ch_{num_of_chapter}'
+    course = config.courses.get(formatted_chapter)
     name = course['name']
     short_name_for_receipt = course['short_name_for_receipt']
     payment = Payment.create({
@@ -46,7 +35,7 @@ async def create_payment(price, user_id, email, num_of_chapter, order_id, order_
         "metadata": {
             "type": "self",
             "user_id": user_id,
-            "chapter": num_of_chapter,
+            "chapter": formatted_chapter,
             "order_id": order_id
         },
         "receipt": {
@@ -70,18 +59,54 @@ async def create_payment(price, user_id, email, num_of_chapter, order_id, order_
     return payment.confirmation.confirmation_url
 
 
+# def create_payment_robokassa(price, email, num_of_chapter, order_code, order_id, user_id):
+#     formatted_chapter = f'ch_{num_of_chapter}'
+#     course = config.courses.get(formatted_chapter)
+#     name = course['name']
+#     description = f"Доступ к разделу курса {name}. Заказ #n{order_code}"
+#
+#     receipt = {
+#         "items": [
+#             {
+#                 "Name": description,
+#                 "Quantity": 1,
+#                 "Sum": price,
+#                 "PaymentMethod": "full_prepayment",
+#                 "PaymentObject": "service",
+#                 "Tax": "none"
+#             }
+#         ]
+#
+#     }
+#     response = robokassa.generate_open_payment_link(
+#         merchant_comments="no comment",
+#         description=description,
+#         invoice_type=InvoiceType.ONE_TIME,
+#         email=email,
+#         receipt=receipt,
+#         inv_id=order_code,
+#         out_sum=price,
+#         user_id=user_id,  # 👈 кастомное поле
+#         formatted_chapter=formatted_chapter,  # 👈 ещё одно кастомное поле
+#         order_id=order_id  # 👈 и ещё
+#     )
+#
+#     return response.url  # ✅ ВАЖНО: возвращаем строку, а не объект
+
 def create_payment_robokassa(price, email, num_of_chapter, order_code, order_id, user_id):
-    course_keys = num_of_chapter.split(',')  # Например: ['course']
+    chapter_nums = num_of_chapter.split(',')  # Например: ['1', '2']
+    formatted_chapters = [f'ch_{num}' for num in chapter_nums]
 
     items = []
 
-    for course_key in course_keys:
-        course = config.courses.get(course_key)
+    for num in chapter_nums:
+        chapter_key = f'ch_{num}'
+        course = config.courses.get(chapter_key)
         if not course:
             continue
 
         items.append({
-            "Name": course['short_name_for_receipt'],
+            "Name": f"{course['short_name_for_receipt']}",
             "Quantity": 1,
             "Sum": course['price'],
             "PaymentMethod": "full_prepayment",
@@ -104,127 +129,45 @@ def create_payment_robokassa(price, email, num_of_chapter, order_code, order_id,
         out_sum=price,
         user_id=user_id,
         recurring=True,
-        formatted_chapter=",".join(course_keys),
+        formatted_chapter=",".join(formatted_chapters),
         order_id=order_id
     )
-    logger.info(response)
+
     return response.url
 
 
-async def create_recurring_payment_robokassa_old(price, email, num_of_chapter, order_code, order_id, user_id,
-                                             previous_inv_id):
-    """
-    Создает рекуррентный платеж через Robokassa
-
-    Args:
-        price: Сумма платежа
-        email: Email пользователя
-        num_of_chapter: Ключи курсов (например: "course")
-        order_code: Новый код заказа
-        order_id: Новый ID заказа
-        user_id: ID пользователя
-        previous_inv_id: ID первого успешного платежа (для рекуррентных списаний)
-    """
-    course_keys = num_of_chapter.split(',')  # Например: ['course']
-
-    items = []
-
-    for course_key in course_keys:
-        course = config.courses.get(course_key)
-        if not course:
-            continue
-
-        items.append({
-            "Name": f"{course['short_name_for_receipt']}",
-            "Quantity": 1,
-            "Sum": course['price'],
-            "PaymentMethod": "full_prepayment",
-            "PaymentObject": "service",
-            "Tax": "none"
-        })
-
-    # Описание для платёжной ссылки (не чек)
-    description = f"Рекуррентный платеж за доступ к курсу. #n{order_code}"
-
-    receipt = {"items": items}
-
-    try:
-        result = await robokassa.execute_recurring_payment(
-            previous_inv_id=previous_inv_id,  # ID первого успешного платежа
-            out_sum=price,
-            inv_id=order_code,
-            description=description,
-            email=email,
-            receipt=receipt,
-            user_ip=None,  # Если у вас есть функция получения IP
-            shp_user_id=user_id,
-            shp_formatted_chapter=",".join(course_keys),
-            shp_order_id=order_id
-        )
-
-        logger.info(f"Recurring payment executed: {result}")
-        return result
-
-    except Exception as e:
-        logger.error(f"Failed to execute recurring payment: {e}")
-        raise e
-
-
-async def create_recurring_payment_robokassa(price, email, num_of_chapter, order_code, order_id, user_id,
-                                             previous_inv_id):
-    """
-    Создает рекуррентный платеж через Robokassa
-
-    Args:
-        price: Сумма платежа
-        email: Email пользователя
-        num_of_chapter: Ключи курсов (например: "course")
-        order_code: Новый код заказа
-        order_id: Новый ID заказа
-        user_id: ID пользователя
-        previous_inv_id: ID первого успешного платежа (для рекуррентных списаний)
-    """
-    logger.info("No create_recurring_payment_robokassa")
-
-
-def create_test_payment_robokassa(email, order_code, order_id, user_id):
-    """
-    Создает тестовый платеж за 1 рубль через Robokassa
-    
-    Args:
-        email: Email пользователя
-        order_code: Код заказа
-        order_id: ID заказа
-        user_id: ID пользователя
-    """
-    test_price = config.courses['course']['test_price']
-    # Данные для чека
-    items = [{
-        "Name": config.courses['course']['test_short_name_for_receipt'],
-        "Quantity": 1,
-        "Sum": test_price,
-        "PaymentMethod": "full_prepayment",
-        "PaymentObject": "service",
-        "Tax": "none"
-    }]
-
-    # Описание для платёжной ссылки
-    description = f"Пробный доступ к курсу на 2 дня. #n{order_code}"
-
-    receipt = {"items": items}
-
-    response = robokassa.generate_open_payment_link(
-        merchant_comments="test subscription",
-        description=description,
-        invoice_type=InvoiceType.ONE_TIME,
-        email=email,
-        receipt=receipt,
-        inv_id=order_code,
-        out_sum=test_price,
-        user_id=user_id,
-        recurring=True,  # Включаем рекуррентные платежи для последующего списания 990 рублей
-        subscription_type="test",  # Указываем тип подписки (Robokassa добавит shp_)
-        order_id=order_id  # ID заказа (Robokassa добавит shp_)
-    )
-    logger.info(f"Test payment link created: {response}")
-    return response.url
+# async def create_payment_robokassa(price, email, num_of_chapter, order_code, order_id, user_id):
+#     formatted_chapter = f'ch_{num_of_chapter}'
+#     course = config.courses.get(formatted_chapter)
+#     name = course['name']
+#     description = f"Доступ к разделу курса {name}. Заказ #n{order_code}"
+#
+#     receipt = {
+#         "sno": "usn_income",
+#         "items": [
+#             {
+#                 "name": f"Доступ к разделу курса {name}",
+#                 "quantity": 1,
+#                 "sum": price,
+#                 "payment_method": "full_prepayment",
+#                 "payment_object": "service",
+#                 "tax": "none"
+#             }
+#         ],
+#         "email": email
+#     }
+#
+#     response = await robokassa.generate_protected_payment_link(
+#         merchant_comments="no comment",
+#         description=description,
+#         invoice_type=InvoiceType.ONE_TIME,
+#         email=email,
+#         inv_id=order_code,
+#         out_sum=price,
+#         receipt=receipt,
+#         user_id=user_id,
+#         formatted_chapter=formatted_chapter,
+#         order_id=order_id
+#     )
+#
+#     return response.url

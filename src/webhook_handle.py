@@ -49,7 +49,6 @@ async def yookassa_webhook(request: Request, background_tasks: BackgroundTasks):
     course = config.courses.get(chapter)
 
     channel_invite_url = course['channel_invite_link']
-    group_invite_url = course.get('group_invite_link')
     channel_name = course['name']
 
     pdb.add_payment(external_payment_id=payment_id, amount=amount, income_amount=income_amount,
@@ -57,7 +56,6 @@ async def yookassa_webhook(request: Request, background_tasks: BackgroundTasks):
 
     keyboard = [
         [InlineKeyboardButton("Вступить в канал ✅", url=channel_invite_url)],
-        [InlineKeyboardButton("Вступить в группу ✅", url=group_invite_url)]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -85,9 +83,6 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
         user_id = int(data.get("shp_user_id"))
         order_id = int(data.get("shp_order_id"))
         formatted_chapter = data.get("shp_formatted_chapter")
-        
-        # Получаем тип подписки из параметров webhook
-        subscription_type_param = data.get("shp_subscription_type", "regular")
 
         # Проверка: уже обработан?
         if pdb.payment_exists_by_order_code(inv_id):
@@ -113,75 +108,27 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
             order_id=order_id
         )
 
-        # Проверяем, есть ли уже подписка для этого заказа
-        existing_subscription = pdb.get_active_subscription(user_id)
+        # Разбиваем курсы
+        formatted_chapters = formatted_chapter.split(',')
+        course_names = []
+        for chapter_key in formatted_chapters:
+            course = config.courses.get(chapter_key)
+            if not course:
+                logger.warning(f"❌ Курс по ключу '{chapter_key}' не найден.")
+                continue
 
-        if existing_subscription:
-            # Это повторный платеж - продлеваем подписку
-            subscription_type = "renewal"
-            try:
-                pdb.extend_subscription(existing_subscription['subscription_id'])
-                logger.info(f"✅ Подписка {existing_subscription['subscription_id']} продлена")
-                logger.info(f"✅ Задача на повторное списание будет добавлена при следующей синхронизации")
+            course_names.append(course["name"])
+            channel_name = course["name"]
+            channel_invite_url = course["channel_invite_link"]
 
-                # Отменяем kick задачи для этой подписки
-                # К сожалению, у нас нет доступа к context в webhook
-                # Kick задачи будут отменены при проверке в kick_subscription_job
-                logger.info(f"✅ Kick задачи будут отменены при следующей проверке")
+            keyboard = [[InlineKeyboardButton("Вступить в канал ✅", url=channel_invite_url)]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
 
-            except Exception as e:
-                logger.error(f"❌ Ошибка при продлении подписки: {e}")
-                return "OK"
-        else:
-            # Это первый платеж - создаем подписку
-            subscription_type = "new_sub"
-            try:
-                if subscription_type_param == "test":
-                    # Проверяем, может ли пользователь создать тестовую подписку
-                    if not pdb.can_create_test_subscription(user_id):
-                        logger.error(f"❌ Пользователь {user_id} не может создать тестовую подписку (уже были подписки)")
-                        return "OK"
-                    
-                    subscription_id = pdb.create_test_subscription(user_id, order_id)
-                    logger.info(f"✅ Создана тестовая подписка {subscription_id} для пользователя {user_id}")
-                else:
-                    subscription_id = pdb.create_subscription(user_id, order_id)
-                    logger.info(f"✅ Создана обычная подписка {subscription_id} для пользователя {user_id}")
-                
-                logger.info(f"✅ Задача на повторное списание будет добавлена при следующей синхронизации")
-
-            except Exception as e:
-                logger.error(f"❌ Ошибка при создании подписки: {e}")
-                return "OK"
-
-        # У нас только один курс
-        course = config.courses.get('course')
-        if not course:
-            logger.warning(f"❌ Курс не найден.")
-            return "OK"
-
-        course_names = [course["name"]]
-        channel_name = course["name"]
-        channel_invite_url = course["channel_invite_link"]
-        group_invite_url = course.get("group_invite_link")
-
-        keyboard = [
-            [InlineKeyboardButton("Вступить в канал ✅", url=channel_invite_url)],
-            [InlineKeyboardButton("Вступить в группу ✅", url=group_invite_url)]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        # Выбираем сообщение в зависимости от типа подписки
-        if subscription_type_param == "test":
-            message_text = config.bot_msg['test_sub']['activated'].format(channel_name=channel_name)
-        else:
-            message_text = config.bot_msg['payment_success'].format(channel_name=channel_name)
-
-        if subscription_type == 'new_sub':
             background_tasks.add_task(
                 telegram_https.send_message,
                 user_id=user_id,
-                text=message_text,
+                text=f"🎉 Вы успешно оплатили курс <b>{channel_name}</b>!\n\n"
+                     f"Нажмите кнопку ниже, чтобы вступить в канал:",
                 reply_markup=reply_markup
             )
 
@@ -201,12 +148,6 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
         user_template_str = config.admin_msg['user_info_block']
         user_info_block = Template(user_template_str).render(**user_data)
 
-        # Определяем тип подписки для админского уведомления
-        if subscription_type_param == "test":
-            admin_subscription_type = "test_sub"
-        else:
-            admin_subscription_type = subscription_type
-
         # Рендерим общее сообщение админу
         admin_template_str = config.admin_msg['admin_payment_notification']
         admin_payment_notification_text = Template(admin_template_str).render(
@@ -217,8 +158,7 @@ async def robokassa_webhook(request: Request, background_tasks: BackgroundTasks)
             income_amount=income_amount,
             user_id=user_id,
             order_code=inv_id,
-            formatted_chapters=['course'],
-            subscription_type=admin_subscription_type
+            formatted_chapters=formatted_chapters
         )
 
         # Уведомление администратору

@@ -20,7 +20,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Bundle app source
 COPY src /app
-COPY robokassa /app/robokassa
 COPY media /app/media
 COPY config /app/config
 COPY data /app/data
