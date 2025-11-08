@@ -6,7 +6,6 @@ import dotenv
 base_dir = Path(__file__).parent
 config_dir = base_dir.joinpath("config")
 data_dir = base_dir.joinpath("data")
-media_dir = base_dir.joinpath("media")
 
 
 # Функция для чтения YAML файла
