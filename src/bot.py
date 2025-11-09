@@ -43,7 +43,7 @@ moscow_tz = pytz.timezone('Europe/Moscow')
 
 # Это словарь одобренных пользователей
 allowed_users = {
-    7768888247: "Roman"
+    776888800247: "Roman"
 }
 
 
