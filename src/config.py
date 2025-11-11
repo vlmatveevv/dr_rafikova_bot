@@ -5,6 +5,7 @@ import dotenv
 
 base_dir = Path(__file__).parent
 config_dir = base_dir.joinpath("config")
+media_dir = base_dir.joinpath("media")
 data_dir = base_dir.joinpath("data")
 
 

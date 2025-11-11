@@ -130,6 +130,19 @@ async def register(update: Update, context: CallbackContext) -> int:
     keyboard = [[InlineKeyboardButton(config.bot_btn['buy_courses'], callback_data='buy_courses')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
+    video_path = config.media_dir / "video.mp4"
+
+    try:
+        with open(video_path, 'rb') as video:
+            await context.bot.send_video_note(
+                chat_id=user_id,
+                video_note=video
+            )
+        await asyncio.sleep(5)
+    except telegram.error.BadRequest as e:
+        logger.info(f"Ошибка при отправке video note: {e}")
+        pass
+
     await context.bot.send_message(
         chat_id=user_id,
         text=f"{config.bot_msg['hello'].format(first_name=first_name)}",

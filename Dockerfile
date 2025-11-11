@@ -21,6 +21,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Bundle app source
 COPY src /app
 COPY config /app/config
+COPY media /app/media
 COPY data /app/data
 
 CMD ["python", "__main__.py"]
