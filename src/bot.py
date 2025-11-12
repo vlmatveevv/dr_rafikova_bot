@@ -348,8 +348,7 @@ async def pay_chapter_callback_handle(update: Update, context: CallbackContext) 
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await query.edit_message_text(
-        text="📄 Я ознакомился и принимаю условия Публичной оферты.\n\n"
-             f'<a href="{config.other_cfg["links"]["offer"]}">Открыть оферту</a>',
+        text=f'📄 Я ознакомился и принимаю условия <a href="{config.other_cfg["links"]["offer"]}">Публичной оферты.</a>',
         reply_markup=reply_markup,
         parse_mode=ParseMode.HTML,
         disable_web_page_preview=True
@@ -394,8 +393,7 @@ async def start_payment_handle(update: Update, context: CallbackContext, selecte
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await query.edit_message_text(
-        text="📄 Я ознакомился и принимаю условия Публичной оферты.\n\n"
-             f'<a href="{config.other_cfg["links"]["offer"]}">Открыть оферту</a>',
+        text=f'📄 Я ознакомился и принимаю условия <a href="{config.other_cfg["links"]["offer"]}">Публичной оферты.</a>',
         reply_markup=reply_markup,
         parse_mode=ParseMode.HTML,
         disable_web_page_preview=True
@@ -416,8 +414,7 @@ async def handle_offer_agree(update: Update, context: CallbackContext) -> int:
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await query.edit_message_text(
-        text='🔐 Я даю согласие на обработку моих персональных данных.\n\n'
-             f'<a href="{config.other_cfg["links"]["privacy"]}">Политика обработки данных</a>',
+        text=f'Я даю <a href="{config.other_cfg["links"]["personal"]}">согласие</a> на обработку моих персональных данных  в соответствии с условиями <a href="{config.other_cfg["links"]["personal"]}">Политики по обработке персональных данных.</a>',
         reply_markup=reply_markup,
         parse_mode=ParseMode.HTML,
         disable_web_page_preview=True
@@ -440,8 +437,7 @@ async def handle_privacy_agree(update: Update, context: CallbackContext) -> int:
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await query.edit_message_text(
-        text="📬 Я даю согласие на получение рекламной и информационной рассылки.\n\n"
-             f'<a href="{config.other_cfg["links"]["consent"]}">Документ о рассылке</a>',
+        text=f'📬 Я даю согласие на получение <a href="{config.other_cfg["links"]["consent"]}">рекламной и информационной рассылки.</a>',
         reply_markup=reply_markup,
         parse_mode=ParseMode.HTML,
         disable_web_page_preview=True
