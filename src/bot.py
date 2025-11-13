@@ -19,6 +19,7 @@ import keyboard as my_keyboard
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, BotCommand, ReplyKeyboardMarkup, \
     ReplyKeyboardRemove, KeyboardButton, InputMediaPhoto, InputMediaDocument
 from telegram.constants import ParseMode, ChatAction
+from telegram.error import RetryAfter
 from telegram.ext import (
     Application,
     ApplicationBuilder,
@@ -761,13 +762,102 @@ async def go_back_callback_handle(update: Update, context: CallbackContext) -> N
 
 async def mail_command(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
+
+    # Список пользователей для рассылки
+    list_data = [
+        146679674, 146679674, 146679674, 146679674, 146679674,
+        146679674, 146679674, 146679674, 146679674, 146679674,
+        146679674, 146679674, 146679674, 146679674, 146679674,
+        146679674, 146679674, 146679674, 146679674, 146679674,
+        146679674, 146679674, 146679674, 146679674, 146679674,
+        146679674, 146679674, 146679674, 146679674, 146679674,
+        146679674, 146679674, 146679674, 146679674, 146679674,
+        146679674, 146679674, 146679674, 146679674, 146679674,
+        146679674, 146679674, 146679674, 146679674, 146679674,
+        146679674, 146679674, 146679674, 146679674, 146679674,
+        146679674, 146679674, 146679674, 146679674, 146679674,
+        146679674, 146679674, 146679674, 146679674, 146679674,
+        146679674, 146679674, 146679674, 146679674, 146679674,
+        146679674, 146679674, 146679674, 146679674, 146679674,
+        146679674, 146679674, 146679674, 146679674, 146679674,
+        146679674, 146679674, 146679674, 146679674, 146679674,
+        146679674, 146679674, 146679674, 146679674, 146679674,
+        146679674, 146679674, 146679674, 146679674, 146679674,
+        146679674, 146679674, 146679674, 146679674, 146679674,
+        146679674, 146679674, 146679674, 146679674, 146679674,
+        146679674, 146679674, 146679674, 146679674, 146679674,
+        146679674, 146679674, 146679674, 146679674, 146679674,
+        146679674, 146679674, 146679674, 146679674, 146679674,
+        146679674, 146679674, 146679674, 146679674, 146679674,
+        146679674, 146679674, 146679674, 146679674, 146679674,
+        146679674, 146679674, 146679674, 146679674, 146679674,
+        146679674, 146679674, 146679674, 146679674, 146679674,
+        146679674, 146679674, 146679674, 146679674, 146679674,
+        146679674, 146679674, 146679674, 146679674, 146679674,
+        146679674, 146679674, 146679674, 146679674, 146679674,
+        146679674, 146679674, 146679674, 146679674, 146679674,
+        146679674, 146679674, 146679674, 146679674, 146679674,
+        146679674, 146679674, 146679674, 146679674, 146679674,
+    ]
+
+    successful_sends = 0
+    failed_sends = 0
+
     if user_id == 146679674:
         img1_path = config.media_dir / "IMG_1.jpg"
         keyboard = [[InlineKeyboardButton(config.bot_btn['buy_courses'], callback_data='buy_courses')]]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        # Отправляем изображение с кнопкой
-        await context.bot.send_photo(chat_id=user_id, caption=config.mailling_msg['mail1310'], photo=open(img1_path, 'rb'), reply_markup=reply_markup)
+        batch_size = 50          # сколько пользователей в одном батче
+        per_message_delay = 0.2  # задержка между сообщениями внутри батча
+        per_batch_delay = 5      # задержка между батчами
+
+        # Перебор по батчам
+        for i in range(0, len(list_data), batch_size):
+            batch = list_data[i:i + batch_size]
+
+            for user_mail_id in batch:
+                try:
+                    await context.bot.send_photo(
+                        chat_id=user_mail_id,
+                        caption=config.mailling_msg['mail1310'],
+                        photo=open(img1_path, 'rb'),
+                        reply_markup=reply_markup
+                    )
+                    successful_sends += 1
+
+                except RetryAfter as e:
+                    # Флуд-контроль: ждём указанное телеграмом время
+                    # Можно логировать, если у тебя есть logger
+                    # logger.warning(f"Flood control для {user_mail_id}: ждём {e.retry_after} секунд")
+                    await asyncio.sleep(e.retry_after)
+                    failed_sends += 1
+
+                except Exception as e:
+                    # Любая другая ошибка отправки
+                    # logger.error(f"Ошибка при отправке {user_mail_id}: {e}")
+                    failed_sends += 1
+
+                # Небольшая задержка между отправками
+                await asyncio.sleep(per_message_delay)
+
+            # Пауза между батчами, чтобы не упереться в лимиты
+            # logger.info(f"Завершён батч с {len(batch)} пользователями, делаем паузу.")
+            await asyncio.sleep(per_batch_delay)
+
+        result_message = (
+            f"Рассылка завершена!\n\n"
+            f"Успешно отправлено: {successful_sends}\n"
+            f"Не удалось отправить: {failed_sends}\n"
+        )
+
+        # Отправляем отчёт админу (инициатору рассылки)
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=result_message,
+            parse_mode=ParseMode.HTML
+        )
+
 
 async def error_handler(update: object, context: CallbackContext) -> None:
     logger.error("Exception while handling an update:", exc_info=context.error)
