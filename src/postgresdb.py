@@ -539,3 +539,37 @@ class Database:
         except Exception as e:
             print(f"❌ Ошибка при проверке ручного доступа: {e}")
             return False
+
+    def get_users_without_course_and_newsletter_decline(self) -> list[int]:
+        """
+        Возвращает список user_id, которые:
+        - не покупали курс 'ch_1'
+        - не имеют заказов с agreed_newsletter = false
+
+        :return: список Telegram user_id
+        """
+        try:
+            with self.conn.cursor() as cursor:
+                query = """
+                    SELECT u.user_id
+                    FROM users u
+                    WHERE NOT EXISTS (  -- не покупал ch_1
+                        SELECT 1
+                        FROM orders o
+                        JOIN payments p ON p.order_id = o.order_id
+                        WHERE o.user_id = u.user_id
+                          AND ('ch_1' = ANY (o.course_chapter))
+                    )
+                    AND NOT EXISTS (  -- нет заказов с отказом от рассылки
+                        SELECT 1
+                        FROM orders o
+                        WHERE o.user_id = u.user_id
+                          AND o.agreed_newsletter = FALSE
+                    );
+                """
+                cursor.execute(query)
+                rows = cursor.fetchall()
+                return [row[0] for row in rows]
+        except Exception as e:
+            print(f"❌ Ошибка при получении списка user_id: {e}")
+            return []

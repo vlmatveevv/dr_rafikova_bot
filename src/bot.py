@@ -759,6 +759,14 @@ async def go_back_callback_handle(update: Update, context: CallbackContext) -> N
         await buy_courses_command(update, context)
 
 
+async def mail_command(update: Update, context: CallbackContext) -> None:
+    user_id = update.effective_user.id
+    if user_id == 146679674:
+        await context.bot.send_message(
+            chat_id=user_id, text=config.mailling_msg['mail1310'], parse_mode=ParseMode.HTML
+        )
+
+
 async def error_handler(update: object, context: CallbackContext) -> None:
     logger.error("Exception while handling an update:", exc_info=context.error)
 
@@ -845,6 +853,7 @@ def run():
     application.add_handler(CommandHandler('all_courses', all_courses_command))
     application.add_handler(CommandHandler('documents', documents_command))
     application.add_handler(CommandHandler('support', support_command))
+    application.add_handler(CommandHandler('mailx', mail_command))
 
     application.add_handler(CallbackQueryHandler(buy_courses_callback_handle, pattern="^buy_courses$"))
     application.add_handler(CallbackQueryHandler(buy_chapter_callback_handle, pattern="^buy_chapter:"))
