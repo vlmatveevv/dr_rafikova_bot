@@ -799,7 +799,7 @@ async def mail_command(update: Update, context: CallbackContext) -> None:
         146679674, 146679674, 146679674, 146679674, 146679674,
         146679674, 146679674, 146679674, 146679674, 146679674,
     ]
-
+    list_data = list(set(list_data))
     successful_sends = 0
     failed_sends = 0
 
