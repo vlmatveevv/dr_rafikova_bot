@@ -762,10 +762,12 @@ async def go_back_callback_handle(update: Update, context: CallbackContext) -> N
 async def mail_command(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
     if user_id == 146679674:
-        await context.bot.send_message(
-            chat_id=user_id, text=config.mailling_msg['mail1310'], parse_mode=ParseMode.HTML
-        )
+        img1_path = config.media_dir / "IMG_1.jpg"
+        keyboard = [[InlineKeyboardButton(config.bot_btn['buy_courses'], callback_data='buy_courses')]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
 
+        # Отправляем изображение с кнопкой
+        await context.bot.send_photo(chat_id=user_id, caption=config.mailling_msg['mail1310'], photo=open(img1_path, 'rb'), reply_markup=reply_markup)
 
 async def error_handler(update: object, context: CallbackContext) -> None:
     logger.error("Exception while handling an update:", exc_info=context.error)
