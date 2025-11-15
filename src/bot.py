@@ -832,7 +832,8 @@ async def mail_command(update: Update, context: CallbackContext) -> None:
                     await context.bot.send_message(
                         chat_id=user_mail_id,
                         text=config.mailling_msg['mail1510'],
-                        parse_mode=ParseMode.HTML
+                        parse_mode=ParseMode.HTML,
+                        reply_markup=reply_markup
                     )
                     successful_sends += 1
 
