@@ -558,13 +558,14 @@ class Database:
                         FROM orders o
                         JOIN payments p ON p.order_id = o.order_id
                         WHERE o.user_id = u.user_id
-                          AND ('ch_1' = ANY (o.course_chapter))
+                          AND 'ch_1' = ANY (o.course_chapter)
                     )
-                    AND NOT EXISTS (  -- нет заказов с отказом от рассылки
+                    AND NOT EXISTS (  -- нет ОПЛАЧЕННЫХ заказов с отказом от рассылки
                         SELECT 1
                         FROM orders o
                         WHERE o.user_id = u.user_id
                           AND o.agreed_newsletter = FALSE
+                          AND o.payment_message_id IS NOT NULL
                     );
                 """
                 cursor.execute(query)
