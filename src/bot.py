@@ -824,9 +824,15 @@ async def mail_command(update: Update, context: CallbackContext) -> None:
                 try:
                     await context.bot.send_photo(
                         chat_id=user_mail_id,
-                        caption=config.mailling_msg['mail1510'],
+                        caption=config.mailling_msg['mail1510_1'],
                         photo=open(img2_path, 'rb'),
                         reply_markup=reply_markup
+                    )
+                    await asyncio.sleep(0.1)
+                    await context.bot.send_message(
+                        chat_id=user_mail_id,
+                        text=config.mailling_msg['mail1510'],
+                        parse_mode=ParseMode.HTML
                     )
                     successful_sends += 1
 
