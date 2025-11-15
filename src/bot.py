@@ -833,20 +833,20 @@ async def mail_command(update: Update, context: CallbackContext) -> None:
                 except RetryAfter as e:
                     # Флуд-контроль: ждём указанное телеграмом время
                     # Можно логировать, если у тебя есть logger
-                    # logger.warning(f"Flood control для {user_mail_id}: ждём {e.retry_after} секунд")
+                    logger.warning(f"Flood control для {user_mail_id}: ждём {e.retry_after} секунд")
                     await asyncio.sleep(e.retry_after)
                     failed_sends += 1
 
                 except Exception as e:
                     # Любая другая ошибка отправки
-                    # logger.error(f"Ошибка при отправке {user_mail_id}: {e}")
+                    logger.error(f"Ошибка при отправке {user_mail_id}: {e}")
                     failed_sends += 1
 
                 # Небольшая задержка между отправками
                 await asyncio.sleep(per_message_delay)
 
             # Пауза между батчами, чтобы не упереться в лимиты
-            # logger.info(f"Завершён батч с {len(batch)} пользователями, делаем паузу.")
+            logger.info(f"Завершён батч с {len(batch)} пользователями, делаем паузу.")
             await asyncio.sleep(per_batch_delay)
 
         result_message = (
