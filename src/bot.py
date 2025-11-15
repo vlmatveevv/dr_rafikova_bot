@@ -19,7 +19,7 @@ import keyboard as my_keyboard
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, BotCommand, ReplyKeyboardMarkup, \
     ReplyKeyboardRemove, KeyboardButton, InputMediaPhoto, InputMediaDocument
 from telegram.constants import ParseMode, ChatAction
-from telegram.error import RetryAfter
+from telegram.error import RetryAfter, BadRequest
 from telegram.ext import (
     Application,
     ApplicationBuilder,
@@ -80,42 +80,79 @@ async def user_exists_pdb(user_id: int) -> bool:
     return pdb.user_exists(user_id)
 
 
+
+def handle_message_not_modified(func):
+    async def wrapper(*args, **kwargs):
+        try:
+            return await func(*args, **kwargs)
+        except BadRequest as e:
+            logger.info(f"Возникла ошибка BadRequest {e}")
+            pass
+        except Exception as e:
+            logger.info(f"Возникла ошибка Exception {e}")
+
+    return wrapper
+
+
+@handle_message_not_modified
 async def send_or_edit_message(update: Update, context: CallbackContext, text: str,
                                reply_markup: InlineKeyboardMarkup = None, new_message=False):
     if new_message:
-        await context.bot.send_message(
+        message = await context.bot.send_message(
             chat_id=update.effective_user.id,
             text=text,
             reply_markup=reply_markup,
             parse_mode=ParseMode.HTML,
             disable_web_page_preview=True
         )
-        return
+        return message
+
     if update.callback_query:
         if update.callback_query.message.text:
-            await update.callback_query.edit_message_text(
-                text=text,
-                reply_markup=reply_markup,
-                parse_mode=ParseMode.HTML,
-                disable_web_page_preview=True
-            )
+            try:
+                await update.callback_query.edit_message_text(
+                    text=text,
+                    reply_markup=reply_markup,
+                    parse_mode=ParseMode.HTML,
+                    disable_web_page_preview=True
+                )
+                return update.callback_query.message
+            except Exception:
+                # Попытка удалить сообщение, если редактирование не удалось
+                try:
+                    await update.callback_query.message.delete()
+                except Exception:
+                    pass  # Просто игнорируем, если удалить нельзя
+                message = await context.bot.send_message(
+                    chat_id=update.effective_user.id,
+                    text=text,
+                    reply_markup=reply_markup,
+                    parse_mode=ParseMode.HTML,
+                    disable_web_page_preview=True
+                )
+                return message
         else:
-            await update.callback_query.message.delete()
-            await context.bot.send_message(
+            try:
+                await update.callback_query.message.delete()
+            except Exception:
+                pass  # Если не удалось удалить, продолжаем
+            message = await context.bot.send_message(
                 chat_id=update.effective_user.id,
                 text=text,
                 reply_markup=reply_markup,
                 parse_mode=ParseMode.HTML,
                 disable_web_page_preview=True
             )
+            return message
     else:
-        await context.bot.send_message(
+        message = await context.bot.send_message(
             chat_id=update.effective_user.id,
             text=text,
             reply_markup=reply_markup,
             parse_mode=ParseMode.HTML,
             disable_web_page_preview=True
         )
+        return message
 
 
 async def register(update: Update, context: CallbackContext) -> int:
@@ -764,13 +801,14 @@ async def mail_command(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
 
     # Список пользователей для рассылки
-    list_data = pdb.get_users_without_course_and_newsletter_decline()
-    list_data = list(set(list_data))
+    # list_data = pdb.get_users_without_course_and_newsletter_decline()
+    # list_data = list(set(list_data))
+    list_data = [146679674, 146679674]
     successful_sends = 0
     failed_sends = 0
 
     if user_id == 146679674:
-        img1_path = config.media_dir / "IMG_1.jpg"
+        img2_path = config.media_dir / "IMG_2.jpg"
         keyboard = [[InlineKeyboardButton(config.bot_btn['buy_courses'], callback_data='buy_courses')]]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -786,8 +824,8 @@ async def mail_command(update: Update, context: CallbackContext) -> None:
                 try:
                     await context.bot.send_photo(
                         chat_id=user_mail_id,
-                        caption=config.mailling_msg['mail1310'],
-                        photo=open(img1_path, 'rb'),
+                        caption=config.mailling_msg['mail1510'],
+                        photo=open(img2_path, 'rb'),
                         reply_markup=reply_markup
                     )
                     successful_sends += 1
