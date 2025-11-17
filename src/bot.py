@@ -801,14 +801,14 @@ async def mail_command(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
 
     # Список пользователей для рассылки
-    list_data = pdb.get_users_without_course_and_newsletter_decline()
-    list_data = list(set(list_data))
-    # list_data = [146679674, 146679674]
+    # list_data = pdb.get_users_without_course_and_newsletter_decline()
+    # list_data = list(set(list_data))
+    list_data = [146679674, 146679674]
     successful_sends = 0
     failed_sends = 0
 
     if user_id == 146679674:
-        img2_path = config.media_dir / "IMG_2.jpg"
+        img2_path = config.media_dir / "IMG_3.jpg"
         keyboard = [[InlineKeyboardButton(config.bot_btn['buy_courses'], callback_data='buy_courses')]]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -822,16 +822,16 @@ async def mail_command(update: Update, context: CallbackContext) -> None:
 
             for user_mail_id in batch:
                 try:
-                    await context.bot.send_photo(
-                        chat_id=user_mail_id,
-                        caption=config.mailling_msg['mail1510_1'],
-                        photo=open(img2_path, 'rb'),
-                        reply_markup=reply_markup
-                    )
-                    await asyncio.sleep(0.1)
+                    # await context.bot.send_photo(
+                    #     chat_id=user_mail_id,
+                    #     caption=config.mailling_msg['mail1510_1'],
+                    #     photo=open(img2_path, 'rb'),
+                    #     reply_markup=reply_markup
+                    # )
+                    # await asyncio.sleep(0.1)
                     await context.bot.send_message(
                         chat_id=user_mail_id,
-                        text=config.mailling_msg['mail1510'],
+                        text=config.mailling_msg['mail1710'],
                         parse_mode=ParseMode.HTML,
                         reply_markup=reply_markup
                     )
