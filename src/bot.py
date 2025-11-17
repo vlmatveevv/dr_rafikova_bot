@@ -808,7 +808,7 @@ async def mail_command(update: Update, context: CallbackContext) -> None:
     failed_sends = 0
 
     if user_id == 146679674:
-        img2_path = config.media_dir / "IMG_3.jpg"
+        img3_path = config.media_dir / "IMG_3.jpg"
         keyboard = [[InlineKeyboardButton(config.bot_btn['buy_courses'], callback_data='buy_courses')]]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -822,19 +822,19 @@ async def mail_command(update: Update, context: CallbackContext) -> None:
 
             for user_mail_id in batch:
                 try:
-                    # await context.bot.send_photo(
-                    #     chat_id=user_mail_id,
-                    #     caption=config.mailling_msg['mail1510_1'],
-                    #     photo=open(img2_path, 'rb'),
-                    #     reply_markup=reply_markup
-                    # )
-                    # await asyncio.sleep(0.1)
-                    await context.bot.send_message(
+                    await context.bot.send_photo(
                         chat_id=user_mail_id,
-                        text=config.mailling_msg['mail1710'],
-                        parse_mode=ParseMode.HTML,
+                        caption=config.mailling_msg['mail1710'],
+                        photo=open(img3_path, 'rb'),
                         reply_markup=reply_markup
                     )
+                    # await asyncio.sleep(0.1)
+                    # await context.bot.send_message(
+                    #     chat_id=user_mail_id,
+                    #     text=config.mailling_msg['mail1710'],
+                    #     parse_mode=ParseMode.HTML,
+                    #     reply_markup=reply_markup
+                    # )
                     successful_sends += 1
 
                 except RetryAfter as e:
