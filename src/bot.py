@@ -801,9 +801,9 @@ async def mail_command(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
 
     # Список пользователей для рассылки
-    # list_data = pdb.get_users_without_course_and_newsletter_decline()
-    # list_data = list(set(list_data))
-    list_data = [146679674, 146679674]
+    list_data = pdb.get_users_without_course_and_newsletter_decline()
+    list_data = list(set(list_data))
+    # list_data = [146679674, 146679674]
     successful_sends = 0
     failed_sends = 0
 
